@@ -135,9 +135,21 @@
 		"defaultMessage": "Back to {to}",
 		"description": "Tooltip and name of a reset button; {to} is the value it puts back."
 	},
+	"common.cancel": {
+		"defaultMessage": "Cancel",
+		"description": "Button that closes a dialog without doing anything."
+	},
 	"common.close": {
 		"defaultMessage": "Close",
 		"description": "Button that closes a dialog, a panel or a full-screen view."
+	},
+	"common.counter": {
+		"defaultMessage": "{index} / {total}",
+		"description": "A position in a run, e.g. “3 / 12”."
+	},
+	"common.delete": {
+		"defaultMessage": "Delete",
+		"description": "Button: delete the thing shown."
 	},
 	"common.mm": {
 		"defaultMessage": "mm",
@@ -147,9 +159,389 @@
 		"defaultMessage": "Off",
 		"description": "Option that turns a setting off."
 	},
+	"common.redo": {
+		"defaultMessage": "Redo",
+		"description": "Button: redo the last change undone."
+	},
+	"common.save": {
+		"defaultMessage": "Save",
+		"description": "Button: save the edit."
+	},
+	"common.undo": {
+		"defaultMessage": "Undo",
+		"description": "Button: undo the last change."
+	},
 	"css.editorLabel": {
 		"defaultMessage": "The template's CSS",
 		"description": "Screen-reader name of the stylesheet editor's text field."
+	},
+	"design.lock": {
+		"defaultMessage": "Lock",
+		"description": "Button: lock the design so nothing on it can be moved or restyled."
+	},
+	"design.lockTitle": {
+		"defaultMessage": "Lock the design — no dragging, no option changes",
+		"description": "Tooltip of the button that locks the design."
+	},
+	"design.unlock": {
+		"defaultMessage": "Unlock",
+		"description": "Button: unlock the design."
+	},
+	"design.unlockTitle": {
+		"defaultMessage": "Unlock the design",
+		"description": "Tooltip of the button that unlocks the design."
+	},
+	"draw.applyCrop": {
+		"defaultMessage": "Apply Crop",
+		"description": "Button: crop the drawing to the frame."
+	},
+	"draw.applyCropTitle": {
+		"defaultMessage": "Keep only what is inside the frame",
+		"description": "Tooltip of Apply Crop."
+	},
+	"draw.board": {
+		"defaultMessage": "Board",
+		"description": "Screen-reader name of the toolbar acting on the whole drawing."
+	},
+	"draw.boardHeight": {
+		"defaultMessage": "Board height in pixels",
+		"description": "Screen-reader name of the drawing's height field."
+	},
+	"draw.boardHeightTitle": {
+		"defaultMessage": "Board height, in pixels",
+		"description": "Tooltip of the drawing's height field."
+	},
+	"draw.boardWidth": {
+		"defaultMessage": "Board width in pixels",
+		"description": "Screen-reader name of the drawing's width field."
+	},
+	"draw.boardWidthTitle": {
+		"defaultMessage": "Board width, in pixels",
+		"description": "Tooltip of the drawing's width field."
+	},
+	"draw.circle": {
+		"defaultMessage": "Circle",
+		"description": "Drawing tool: circles."
+	},
+	"draw.circleTitle": {
+		"defaultMessage": "Circle — drag across it. Press twice for any ellipse; Shift for one",
+		"description": "Tooltip of the circle tool."
+	},
+	"draw.clipboardRefused": {
+		"defaultMessage": "This browser would not let go of the clipboard",
+		"description": "Notice when the browser refuses to copy to or read from the clipboard."
+	},
+	"draw.color": {
+		"defaultMessage": "Color to draw in",
+		"description": "Screen-reader name of the drawing color swatch."
+	},
+	"draw.colorTitle": {
+		"defaultMessage": "The colour to draw in — it starts as this area's own",
+		"description": "Tooltip of the drawing color swatch."
+	},
+	"draw.copied": {
+		"defaultMessage": "Copied",
+		"description": "Notice after copying the drawing to the clipboard."
+	},
+	"draw.copy": {
+		"defaultMessage": "Copy",
+		"description": "Button: copy the drawing as an image."
+	},
+	"draw.copyTitle": {
+		"defaultMessage": "Copy the drawing as an image (Ctrl/Cmd+C)",
+		"description": "Tooltip of the drawing's Copy button."
+	},
+	"draw.crop": {
+		"defaultMessage": "Crop",
+		"description": "Button: start cropping the drawing."
+	},
+	"draw.cropTitle": {
+		"defaultMessage": "Crop — drag a frame over the board",
+		"description": "Tooltip of the Crop button."
+	},
+	"draw.darkChecks": {
+		"defaultMessage": "Dark checkerboard",
+		"description": "Screen-reader name of the button switching the transparency checkerboard dark or light."
+	},
+	"draw.darkChecksTitle": {
+		"defaultMessage": "Show the transparent squares dark or light — a pale drawing needs the dark ones",
+		"description": "Tooltip of the checkerboard button."
+	},
+	"draw.draw": {
+		"defaultMessage": "Draw",
+		"description": "Drawing tool: freehand pen."
+	},
+	"draw.ellipse": {
+		"defaultMessage": "Ellipse",
+		"description": "Drawing tool: ellipses."
+	},
+	"draw.ellipseTitle": {
+		"defaultMessage": "Ellipse — drag across it. Press twice for circles; Shift for one",
+		"description": "Tooltip of the ellipse tool."
+	},
+	"draw.erase": {
+		"defaultMessage": "Erase",
+		"description": "Drawing tool: eraser."
+	},
+	"draw.eraseTitle": {
+		"defaultMessage": "Rub out — back to the paper, not to white",
+		"description": "Tooltip of the eraser."
+	},
+	"draw.flipX": {
+		"defaultMessage": "Flip horizontally",
+		"description": "Button: mirror the drawing left to right."
+	},
+	"draw.flipXTitle": {
+		"defaultMessage": "Flip the drawing left to right",
+		"description": "Tooltip of Flip horizontally."
+	},
+	"draw.flipY": {
+		"defaultMessage": "Flip vertically",
+		"description": "Button: mirror the drawing top to bottom."
+	},
+	"draw.flipYTitle": {
+		"defaultMessage": "Flip the drawing upside down",
+		"description": "Tooltip of Flip vertically."
+	},
+	"draw.label": {
+		"defaultMessage": "Drawing",
+		"description": "Screen-reader name of the drawing surface."
+	},
+	"draw.line": {
+		"defaultMessage": "Line",
+		"description": "Drawing tool: straight lines."
+	},
+	"draw.lineTitle": {
+		"defaultMessage": "Straight line — press where it starts and let go where it ends",
+		"description": "Tooltip of the line tool."
+	},
+	"draw.nib": {
+		"defaultMessage": "{nib, plural, one {Nib, # pixel} other {Nib, # pixels}}",
+		"description": "Screen-reader name of the pen width button."
+	},
+	"draw.nibTitle": {
+		"defaultMessage": "{nib, plural, one {# pixel wide} other {# pixels wide}} — press for {next, select, thinnest {the thinnest} other {wider}}",
+		"description": "Tooltip of the pen width button; next is “thinnest” when pressing goes back to the thinnest width."
+	},
+	"draw.noImage": {
+		"defaultMessage": "No image on the clipboard",
+		"description": "Notice when pasting into a drawing finds no image."
+	},
+	"draw.paste": {
+		"defaultMessage": "Paste",
+		"description": "Button: paste an image into the drawing."
+	},
+	"draw.pasteTitle": {
+		"defaultMessage": "Paste an image from the clipboard — it replaces the board and brings its own size (Ctrl/Cmd+V)",
+		"description": "Tooltip of the drawing's Paste button."
+	},
+	"draw.pasted": {
+		"defaultMessage": "Pasted",
+		"description": "Notice after pasting an image into the drawing."
+	},
+	"draw.pixels": {
+		"defaultMessage": "px",
+		"description": "Unit after the drawing's size fields: pixels."
+	},
+	"draw.rectangle": {
+		"defaultMessage": "Rectangle",
+		"description": "Drawing tool: rectangles."
+	},
+	"draw.rectangleTitle": {
+		"defaultMessage": "Rectangle — drag from corner to corner. Press twice for squares; Shift for one",
+		"description": "Tooltip of the rectangle tool."
+	},
+	"draw.redoTitle": {
+		"defaultMessage": "Redo (Ctrl/Cmd+Shift+Z)",
+		"description": "Tooltip of Redo while drawing."
+	},
+	"draw.rotate": {
+		"defaultMessage": "Rotate",
+		"description": "Button: turn the drawing."
+	},
+	"draw.rotateTitle": {
+		"defaultMessage": "Turn the drawing a quarter turn clockwise",
+		"description": "Tooltip of Rotate."
+	},
+	"draw.square": {
+		"defaultMessage": "Square",
+		"description": "Drawing tool: squares."
+	},
+	"draw.squareTitle": {
+		"defaultMessage": "Square — drag from corner to corner. Press twice for any rectangle; Shift for one",
+		"description": "Tooltip of the square tool."
+	},
+	"draw.stopCropping": {
+		"defaultMessage": "Stop cropping",
+		"description": "Tooltip of the Crop button while cropping."
+	},
+	"draw.tools": {
+		"defaultMessage": "Drawing tools",
+		"description": "Screen-reader name of the toolbar of drawing tools."
+	},
+	"draw.undoTitle": {
+		"defaultMessage": "Undo (Ctrl/Cmd+Z)",
+		"description": "Tooltip of Undo while drawing."
+	},
+	"draw.weight": {
+		"defaultMessage": "/ {weight} KB",
+		"description": "How much the drawing adds to its table cell, in kilobytes."
+	},
+	"draw.weightTitle": {
+		"defaultMessage": "What this drawing adds to the cell it is written into",
+		"description": "Tooltip of the drawing's size in KB."
+	},
+	"export.checklist.background": {
+		"defaultMessage": "<strong>Background graphics</strong> — on, or the browser drops the paper color.",
+		"description": "Print checklist item: the print dialog's background graphics setting."
+	},
+	"export.checklist.headers": {
+		"defaultMessage": "<strong>Headers and footers</strong> — off.",
+		"description": "Print checklist item: the print dialog's headers and footers setting."
+	},
+	"export.checklist.margins": {
+		"defaultMessage": "<strong>Margins</strong> — <em>None</em>.",
+		"description": "Print checklist item: the print dialog's margins setting; “None” is the setting's own name."
+	},
+	"export.checklist.paper": {
+		"defaultMessage": "<strong>Paper size</strong> — the one matching <strong>{width} × {height} mm</strong>, or a larger sheet you trim.",
+		"description": "Print checklist item: the paper size to choose in the print dialog."
+	},
+	"export.checklist.perSheet": {
+		"defaultMessage": "{count, plural, one {# card per sheet.} other {# cards per sheet.}}",
+		"description": "Added after the paper size when several cards print on a sheet."
+	},
+	"export.checklist.perSheetScaled": {
+		"defaultMessage": "{count, plural, one {# card per sheet, scaled to {percent}%.} other {# cards per sheet, scaled to {percent}%.}}",
+		"description": "Added after the paper size when several cards print on a sheet, made smaller to fit."
+	},
+	"export.checklist.png": {
+		"defaultMessage": "A PNG export needs none of this — it comes out at 300 dpi whatever the print dialog says.",
+		"description": "Note under the print checklist."
+	},
+	"export.checklist.title": {
+		"defaultMessage": "Before you print",
+		"description": "Heading of the checklist of print dialog settings."
+	},
+	"export.done": {
+		"defaultMessage": "{count, plural, one {# PNG exported at 300 dpi, one per {unit, select, sheet {sheet} other {page}}.} other {# PNGs exported at 300 dpi, one per {unit, select, sheet {sheet} other {page}}.}}",
+		"description": "Notice after saving PNG files; unit is “sheet” when several cards print to a sheet, otherwise “page”."
+	},
+	"export.doneZip": {
+		"defaultMessage": "{count, plural, one {# PNG exported at 300 dpi, one per {unit, select, sheet {sheet} other {page}}, in {file}.} other {# PNGs exported at 300 dpi, one per {unit, select, sheet {sheet} other {page}}, in {file}.}}",
+		"description": "Notice after saving several PNG files in one ZIP; file is the ZIP's name."
+	},
+	"export.exporting": {
+		"defaultMessage": "Exporting…",
+		"description": "Button text while PNG files are being made."
+	},
+	"export.exportingCount": {
+		"defaultMessage": "Exporting {done}/{total}…",
+		"description": "Button text while PNG files are being made, with progress, e.g. “Exporting 3/10…”."
+	},
+	"export.failed": {
+		"defaultMessage": "That could not be exported.",
+		"description": "Notice when making PNG files failed for an unknown reason."
+	},
+	"export.fontsNotEmbedded": {
+		"defaultMessage": "{fonts} could not be embedded — upload the font file to export it as itself.",
+		"description": "Added to the export notice; fonts is a list of font names that were replaced in the PNGs."
+	},
+	"export.openCard": {
+		"defaultMessage": "Open card {number} full screen",
+		"description": "Screen-reader name of a page thumbnail on the export screen."
+	},
+	"export.openSheet": {
+		"defaultMessage": "Open sheet {number} full screen",
+		"description": "Screen-reader name of a sheet thumbnail on the export screen."
+	},
+	"export.output": {
+		"defaultMessage": "Output",
+		"description": "Label of the drop-down for which way round the exported pages come out."
+	},
+	"export.outputTitle": {
+		"defaultMessage": "Which way round the PNGs and the printed pages come out. Auto follows the page settings; Portrait or Landscape turns them a quarter if they are not that way already. Kept in this browser, not in the template.",
+		"description": "Tooltip of the Output drop-down."
+	},
+	"export.pages": {
+		"defaultMessage": "{count, plural, one {# page} other {# pages}}",
+		"description": "Button showing how many pages will be exported."
+	},
+	"export.pagesAll": {
+		"defaultMessage": "{chosen} of {total, plural, one {# page} other {# pages}} going. Press to clear them and choose.",
+		"description": "Tooltip of the page count when every page is ticked."
+	},
+	"export.pagesSome": {
+		"defaultMessage": "{chosen} of {total, plural, one {# page} other {# pages}} going. Press to take all of them.",
+		"description": "Tooltip of the page count when some pages are unticked."
+	},
+	"export.png": {
+		"defaultMessage": "PNG",
+		"description": "Button: save the pages as PNG image files."
+	},
+	"export.print": {
+		"defaultMessage": "Print",
+		"description": "Button: open the browser's print dialog."
+	},
+	"export.printTitle": {
+		"defaultMessage": "Print the pages that are going",
+		"description": "Tooltip of the Print button."
+	},
+	"export.recto": {
+		"defaultMessage": "Recto — a right-hand page",
+		"description": "Tooltip on the R mark of a right-hand page."
+	},
+	"export.rectoLetter": {
+		"defaultMessage": "R",
+		"description": "One-letter mark for a right-hand (recto) page."
+	},
+	"export.sheetNumber": {
+		"defaultMessage": "Sheet {number}",
+		"description": "Caption under a sheet thumbnail."
+	},
+	"export.sheetPreview": {
+		"defaultMessage": "Sheet preview",
+		"description": "Screen-reader name of the section showing the printed sheets."
+	},
+	"export.sheets": {
+		"defaultMessage": "{count, plural, one {# sheet} other {# sheets}}",
+		"description": "Button showing how many sheets will be exported."
+	},
+	"export.sheetsAll": {
+		"defaultMessage": "{chosen} of {total, plural, one {# sheet} other {# sheets}} going. Press to clear them and choose.",
+		"description": "Tooltip of the sheet count when every sheet is ticked."
+	},
+	"export.sheetsSome": {
+		"defaultMessage": "{chosen} of {total, plural, one {# sheet} other {# sheets}} going. Press to take all of them.",
+		"description": "Tooltip of the sheet count when some sheets are unticked."
+	},
+	"export.title": {
+		"defaultMessage": "Export",
+		"description": "Heading of the export screen, and its screen-reader name."
+	},
+	"export.verso": {
+		"defaultMessage": "Verso — a left-hand page",
+		"description": "Tooltip on the V mark of a left-hand page."
+	},
+	"export.versoLetter": {
+		"defaultMessage": "V",
+		"description": "One-letter mark for a left-hand (verso) page."
+	},
+	"fontKind.handwriting": {
+		"defaultMessage": "Cursive",
+		"description": "Kind of typeface: handwriting or script."
+	},
+	"fontKind.monospace": {
+		"defaultMessage": "Monospaced",
+		"description": "Kind of typeface: every letter the same width."
+	},
+	"fontKind.sansSerif": {
+		"defaultMessage": "Sans Serif",
+		"description": "Kind of typeface: without serifs."
+	},
+	"fontKind.serif": {
+		"defaultMessage": "Serif",
+		"description": "Kind of typeface: with serifs."
 	},
 	"fontMenu.google": {
 		"defaultMessage": "Google Fonts",
@@ -174,6 +566,374 @@
 	"menuSelect.label": {
 		"defaultMessage": "{label}: {value}",
 		"description": "Screen-reader name of a drop-down: what it sets, then its current choice, e.g. “Font: Inter”."
+	},
+	"pictures.added": {
+		"defaultMessage": "{count, plural, one {{name} added. Drag it onto an area to put it there, or onto the page for an area of its own.} other {# images added. Drag one onto an area to put it there, or onto the page for an area of its own.}}",
+		"description": "Notice after uploading pictures; name is the file name when there is one."
+	},
+	"pictures.backToAll": {
+		"defaultMessage": "Back to every image",
+		"description": "Button: leave the large view of one picture, back to the list."
+	},
+	"pictures.cannotWrite": {
+		"defaultMessage": "This browser cannot write {type} files, so {name} was left as it was.",
+		"description": "Notice when an edited picture cannot be saved in its own format; type is like “WEBP”."
+	},
+	"pictures.confirmDelete.body": {
+		"defaultMessage": "{where, select, folder {It is removed from the folder, and this cannot be undone.} other {It is removed from this browser, and this cannot be undone.}}",
+		"description": "Dialog text before deleting a picture; where is “folder” when it lives in a connected folder."
+	},
+	"pictures.confirmDelete.button": {
+		"defaultMessage": "Delete Image",
+		"description": "Button that confirms deleting a picture."
+	},
+	"pictures.confirmDelete.inUse": {
+		"defaultMessage": "Something on this card or in this table uses it, and will draw nothing until it is put back.",
+		"description": "Added to the delete dialog when the picture is in use."
+	},
+	"pictures.confirmDelete.title": {
+		"defaultMessage": "Delete “{name}”?",
+		"description": "Title of the dialog before deleting a picture."
+	},
+	"pictures.confirmDeleteFont.body": {
+		"defaultMessage": "It is removed from this browser, and this cannot be undone. Nothing in this design is set in it, but another design in your library may be, and would find it missing until the file is chosen again.",
+		"description": "Dialog text before deleting a font file."
+	},
+	"pictures.confirmDeleteFont.button": {
+		"defaultMessage": "Delete Font",
+		"description": "Button that confirms deleting a font."
+	},
+	"pictures.confirmDeleteFont.title": {
+		"defaultMessage": "Delete “{family}”?",
+		"description": "Title of the dialog before deleting a font."
+	},
+	"pictures.connectFolder": {
+		"defaultMessage": "Connect a folder",
+		"description": "Button: keep pictures in a folder on this computer."
+	},
+	"pictures.connectFolderTitle": {
+		"defaultMessage": "Keep images as ordinary files in a folder of your own, rather than in this browser's storage",
+		"description": "Tooltip of Connect a folder."
+	},
+	"pictures.cropTitle": {
+		"defaultMessage": "Crop — drag a frame over the image",
+		"description": "Tooltip of the Crop button on a picture."
+	},
+	"pictures.delete": {
+		"defaultMessage": "Delete {name}",
+		"description": "Button or tooltip: delete this picture or font."
+	},
+	"pictures.deleteFontTitle": {
+		"defaultMessage": "Delete {family} from this browser — nothing in this design is set in it",
+		"description": "Tooltip of an unused font's delete button."
+	},
+	"pictures.deleted": {
+		"defaultMessage": "{name} deleted.",
+		"description": "Notice after deleting a picture that nothing uses."
+	},
+	"pictures.deletedInUse": {
+		"defaultMessage": "{name} deleted. The areas pointing at it will draw nothing until it is put back.",
+		"description": "Notice after deleting a picture that something uses."
+	},
+	"pictures.disconnect": {
+		"defaultMessage": "Disconnect {folder}",
+		"description": "Button: stop using the connected folder."
+	},
+	"pictures.disconnectTitle": {
+		"defaultMessage": "Disconnect {folder}. Nothing in it is deleted; new images go into this browser",
+		"description": "Tooltip of Disconnect."
+	},
+	"pictures.download": {
+		"defaultMessage": "Download {name}",
+		"description": "Button or tooltip: save this file to the computer."
+	},
+	"pictures.downloadDrawing": {
+		"defaultMessage": "Download {label}, {where}",
+		"description": "Screen-reader name of a drawing's download button; where says which row or area it is in."
+	},
+	"pictures.dragLabel": {
+		"defaultMessage": "Drag {name} onto an area",
+		"description": "Screen-reader name of a picture's thumbnail."
+	},
+	"pictures.dragTitle": {
+		"defaultMessage": "Drag onto an area, or onto the page for an area of its own",
+		"description": "Tooltip of a picture's thumbnail."
+	},
+	"pictures.drawings": {
+		"defaultMessage": "Drawings",
+		"description": "Heading of the section listing drawings."
+	},
+	"pictures.dropMiss": {
+		"defaultMessage": "Let go over the page to put the image on it — over an area to put it in that one.",
+		"description": "Notice when a carried picture is let go outside the page."
+	},
+	"pictures.edited": {
+		"defaultMessage": "edited",
+		"description": "Tag beside a picture with unsaved edits."
+	},
+	"pictures.find": {
+		"defaultMessage": "Find…",
+		"description": "Button: choose a file for a missing picture."
+	},
+	"pictures.findFor": {
+		"defaultMessage": "Choose the file to use for {name}",
+		"description": "Tooltip of Find…."
+	},
+	"pictures.flipXTitle": {
+		"defaultMessage": "Flip left to right",
+		"description": "Tooltip of Flip horizontally on a picture."
+	},
+	"pictures.flipYTitle": {
+		"defaultMessage": "Flip upside down",
+		"description": "Tooltip of Flip vertically on a picture."
+	},
+	"pictures.folderChosen": {
+		"defaultMessage": "Images go into {folder} from now on. The ones already in this browser stay where they are.",
+		"description": "Notice after connecting a folder."
+	},
+	"pictures.folderDisconnected": {
+		"defaultMessage": "Folder disconnected. Nothing in it was deleted — this app has simply stopped reading it.",
+		"description": "Notice after disconnecting the folder."
+	},
+	"pictures.folderFallback": {
+		"defaultMessage": "the folder",
+		"description": "Stands in for a folder's name when it is not known."
+	},
+	"pictures.folderFold": {
+		"defaultMessage": "Fold the images in {folder}",
+		"description": "Tooltip: hide the folder's pictures."
+	},
+	"pictures.folderNotOpened": {
+		"defaultMessage": "That folder was not opened, so images are coming from this browser.",
+		"description": "Notice when the browser was not allowed to open the folder."
+	},
+	"pictures.folderNotOpened.tag": {
+		"defaultMessage": "not opened",
+		"description": "Shown beside a connected folder the browser has not opened yet."
+	},
+	"pictures.folderReadFailed": {
+		"defaultMessage": "{folder} could not be read to the end — it may have been moved or renamed.",
+		"description": "Notice when reading the connected folder failed part way."
+	},
+	"pictures.folderShow": {
+		"defaultMessage": "Show the images in {folder}",
+		"description": "Tooltip: show the folder's pictures."
+	},
+	"pictures.folderShut": {
+		"defaultMessage": "{folder} is not open — the browser asks again after a restart",
+		"description": "Tooltip of a folder that needs permission again."
+	},
+	"pictures.folderUnavailable": {
+		"defaultMessage": "A folder of your own needs Chrome or Edge on a computer — this browser cannot keep images in one, so they stay in its own storage",
+		"description": "Tooltip of Connect a folder where the browser cannot do it."
+	},
+	"pictures.fontAuto": {
+		"defaultMessage": "Auto ({kind})",
+		"description": "Option: the kind of face the file says, e.g. “Auto (Serif)”."
+	},
+	"pictures.fontFileTitle": {
+		"defaultMessage": "A font file (TTF, OTF, WOFF or WOFF2) to use as {family}, installed in this browser under this name",
+		"description": "Tooltip of the Upload… item in a font's Replace menu."
+	},
+	"pictures.fontKindTitle": {
+		"defaultMessage": "{family}: what kind of face it is, for the one that stands in where it is missing",
+		"description": "Tooltip of a font's name in the list."
+	},
+	"pictures.fontType": {
+		"defaultMessage": "Type of {family}, for its fallback",
+		"description": "Screen-reader name of a font's kind drop-down."
+	},
+	"pictures.fontTypeTitle": {
+		"defaultMessage": "What kind of face {family} is: where it is missing, a face of this kind stands in",
+		"description": "Tooltip of a font's kind drop-down."
+	},
+	"pictures.fontUpload": {
+		"defaultMessage": "Upload…",
+		"description": "Item in a font's Replace menu: choose a font file."
+	},
+	"pictures.fonts": {
+		"defaultMessage": "Fonts",
+		"description": "Heading of the section listing fonts."
+	},
+	"pictures.images": {
+		"defaultMessage": "Images",
+		"description": "Heading of the section listing pictures."
+	},
+	"pictures.missing": {
+		"defaultMessage": "missing",
+		"description": "Tag on a picture or font the design names but this browser has not got."
+	},
+	"pictures.missingTitle": {
+		"defaultMessage": "{name} — pointed at, but not in this browser",
+		"description": "Tooltip of a missing picture."
+	},
+	"pictures.next": {
+		"defaultMessage": "Next image",
+		"description": "Button in the large picture view."
+	},
+	"pictures.none": {
+		"defaultMessage": "No images yet — upload one, or drop it on an area.",
+		"description": "Shown when there are no pictures."
+	},
+	"pictures.notInBrowser": {
+		"defaultMessage": "{name} is not in this browser.",
+		"description": "Shown in the large view when the picture is missing."
+	},
+	"pictures.open": {
+		"defaultMessage": "Open",
+		"description": "Button: open the connected folder again."
+	},
+	"pictures.openDrawing": {
+		"defaultMessage": "Open {label}, {where}, to draw on",
+		"description": "Tooltip of a drawing in the list."
+	},
+	"pictures.openTitle": {
+		"defaultMessage": "Open {folder} again, to read the images in it",
+		"description": "Tooltip of Open."
+	},
+	"pictures.otherFolder": {
+		"defaultMessage": "Choose another folder",
+		"description": "Button: connect a different folder."
+	},
+	"pictures.otherFolderTitle": {
+		"defaultMessage": "Another folder — images are kept in {folder} now",
+		"description": "Tooltip of Choose another folder."
+	},
+	"pictures.pager": {
+		"defaultMessage": "Image",
+		"description": "Screen-reader name of the previous/next controls."
+	},
+	"pictures.pixelSize": {
+		"defaultMessage": "{width} × {height} px",
+		"description": "A picture's size in pixels."
+	},
+	"pictures.previous": {
+		"defaultMessage": "Previous image",
+		"description": "Button in the large picture view."
+	},
+	"pictures.readFailed": {
+		"defaultMessage": "The pictures kept in this browser could not be read — the list may be out of date.",
+		"description": "Notice when the browser's picture store could not be read."
+	},
+	"pictures.readOnlyType": {
+		"defaultMessage": "Shown only — this browser cannot write {type} files.",
+		"description": "Note in the large view of a picture this browser cannot save; type is like “HEIC”."
+	},
+	"pictures.readOnlyUnknown": {
+		"defaultMessage": "Shown only — this browser cannot write this kind of files.",
+		"description": "Note in the large view of a picture of unknown type."
+	},
+	"pictures.reading": {
+		"defaultMessage": "reading…",
+		"description": "Shown while a folder is being read."
+	},
+	"pictures.replace": {
+		"defaultMessage": "Replace {name}",
+		"description": "Screen-reader name of a picture's Replace button."
+	},
+	"pictures.replaceFontLabel": {
+		"defaultMessage": "Replace {family} with",
+		"description": "Label of a font's Replace menu."
+	},
+	"pictures.replaceFontPlaceholder": {
+		"defaultMessage": "Replace",
+		"description": "Text of a font's Replace menu button."
+	},
+	"pictures.replaceFontTitle": {
+		"defaultMessage": "Upload a file for {family}, or set everything in it in another font instead",
+		"description": "Tooltip of a font's Replace menu."
+	},
+	"pictures.replaceTitle": {
+		"defaultMessage": "Replace {name} with another file, under the same name — everything showing it shows the new one",
+		"description": "Tooltip of a picture's Replace button."
+	},
+	"pictures.replaced": {
+		"defaultMessage": "{name} is now {file} — everything showing it shows the new one.",
+		"description": "Notice after replacing a picture's file."
+	},
+	"pictures.restored": {
+		"defaultMessage": "{name} is back, from {file}.",
+		"description": "Notice after supplying a missing picture."
+	},
+	"pictures.revert": {
+		"defaultMessage": "Revert",
+		"description": "Button: undo the unsaved edits to a picture."
+	},
+	"pictures.revertTitle": {
+		"defaultMessage": "Back to the image as it is stored",
+		"description": "Tooltip of Revert."
+	},
+	"pictures.rotateTitle": {
+		"defaultMessage": "Turn a quarter turn clockwise",
+		"description": "Tooltip of Rotate on a picture."
+	},
+	"pictures.rowTitle": {
+		"defaultMessage": "{name} — {where, select, folder {in {folder}} other {in this browser}}, {used, select, yes {in use} other {unused}}",
+		"description": "Tooltip of a picture in the list; where is “folder” for a picture in the connected folder; used is “yes” when something shows it."
+	},
+	"pictures.saveFirst": {
+		"defaultMessage": "Save or revert the edit first",
+		"description": "Tooltip of a button that waits for an unsaved edit."
+	},
+	"pictures.saveTitle": {
+		"defaultMessage": "Write the edit over {name}",
+		"description": "Tooltip of Save on a picture."
+	},
+	"pictures.saved": {
+		"defaultMessage": "{name} saved — every card showing it shows the edit.",
+		"description": "Notice after saving an edited picture."
+	},
+	"pictures.search": {
+		"defaultMessage": "Search the images",
+		"description": "Screen-reader name and tooltip of the picture search."
+	},
+	"pictures.searchPlaceholder": {
+		"defaultMessage": "Search…",
+		"description": "Placeholder of the picture search field."
+	},
+	"pictures.soFar": {
+		"defaultMessage": "{count} so far…",
+		"description": "Shown while a folder is read: how many pictures have been found."
+	},
+	"pictures.status.local": {
+		"defaultMessage": "local",
+		"description": "Tag on a font whose file is in this browser."
+	},
+	"pictures.status.unused": {
+		"defaultMessage": "local · unused",
+		"description": "Tag on a font whose file is in this browser but not used."
+	},
+	"pictures.systemFontNoFile": {
+		"defaultMessage": "{family} is a system font — it is on the computer already, so there is no file to upload",
+		"description": "Tooltip of a disabled Upload… for a system font."
+	},
+	"pictures.title": {
+		"defaultMessage": "Pictures",
+		"description": "The Pictures tray: its heading and screen-reader name."
+	},
+	"pictures.tools": {
+		"defaultMessage": "Image tools",
+		"description": "Screen-reader name of the toolbar for editing a picture."
+	},
+	"pictures.unused": {
+		"defaultMessage": "unused",
+		"description": "Tag on a picture nothing uses."
+	},
+	"pictures.upload": {
+		"defaultMessage": "Upload images",
+		"description": "Screen-reader name of the upload button."
+	},
+	"pictures.uploadFont": {
+		"defaultMessage": "Upload a file for {family}",
+		"description": "Screen-reader name of a font's upload button."
+	},
+	"pictures.uploadFontTitle": {
+		"defaultMessage": "Upload a font file to use as {family} — installed in this browser under this name",
+		"description": "Tooltip of a font's upload button."
+	},
+	"pictures.uploadTitle": {
+		"defaultMessage": "Upload images from this device",
+		"description": "Tooltip of the upload button."
 	},
 	"print.background.fitTitle": {
 		"defaultMessage": "How the image fills the sheet",

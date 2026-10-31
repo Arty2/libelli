@@ -24,6 +24,24 @@ const entries = Object.entries(catalogue as Record<string, Entry>);
 /** The tags `Msg.svelte` draws as elements; any other keeps its words and loses its element. */
 const DRAWN = new Set(['strong', 'em', 'kbd', 'code']);
 
+/** An object literal's properties, split on its own commas, not those inside a call or an array. */
+function topLevel(body: string): string[] {
+	const parts: string[] = [];
+	let depth = 0;
+	let start = 0;
+	for (let i = 0; i < body.length; i++) {
+		const c = body[i];
+		if (c === '(' || c === '[') depth++;
+		else if (c === ')' || c === ']') depth--;
+		else if (c === ',' && depth === 0) {
+			parts.push(body.slice(start, i));
+			start = i + 1;
+		}
+	}
+	parts.push(body.slice(start));
+	return parts;
+}
+
 /** Calls with a literal key and an object literal of values that has no braces inside it. */
 function calls(source: string): Array<{ key: string; names: string[] | null }> {
 	const out: Array<{ key: string; names: string[] | null }> = [];
@@ -31,7 +49,7 @@ function calls(source: string): Array<{ key: string; names: string[] | null }> {
 	for (const m of source.matchAll(pattern)) {
 		const key = m[1] ?? m[3];
 		const body = m[2] ?? m[4];
-		const names = body === undefined ? [] : body.includes('...') ? null : body.split(',').map((p) => p.split(':')[0].trim()).filter(Boolean);
+		const names = body === undefined ? [] : body.includes('...') ? null : topLevel(body).map((p) => p.split(':')[0].trim()).filter(Boolean);
 		out.push({ key, names });
 	}
 	return out;
