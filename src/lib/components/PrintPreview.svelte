@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Msg from './Msg.svelte';
+	import { listOf, t } from '$lib/i18n';
 	import { tick } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import Card from './Card.svelte';
@@ -194,15 +196,13 @@
 				progress = { done: written, total: elements.length };
 			}
 			if (files.length) downloadBlob(`${stem}.zip`, new Blob([zipStore(files)], { type: 'application/zip' }));
-			const noun = imposed ? 'sheet' : 'page';
+			const unit = imposed ? 'sheet' : 'page';
 			onnotice(
-				`${written} PNG${written === 1 ? '' : 's'} exported at 300 dpi, one per ${noun}${files.length ? `, in ${stem}.zip` : ''}.` +
-					(missing.size
-						? ` ${[...missing].join(', ')} could not be embedded — upload the font file to export it as itself.`
-						: '')
+				(files.length ? t('export.doneZip', { count: written, unit, file: `${stem}.zip` }) : t('export.done', { count: written, unit })) +
+					(missing.size ? ` ${t('export.fontsNotEmbedded', { fonts: listOf([...missing]) })}` : '')
 			);
 		} catch (error) {
-			const reason = error instanceof Error ? error.message : 'That could not be exported.';
+			const reason = error instanceof Error ? error.message : t('export.failed');
 			// Which file it died on matters: the ones already saved are real, and
 			// saying nothing about them reads as though the whole run was lost.
 			// Nothing is saved until the end now — a single PNG, or the archive
@@ -365,7 +365,7 @@
 			style="width:{mmToPx(outerW) * thumbScale}px;height:{mmToPx(outerH) * thumbScale}px"
 			class:current={i === activeRow}
 			onclick={() => open(i)}
-			aria-label="Open card {i + 1} full screen"
+			aria-label={t('export.openCard', { number: i + 1 })}
 			use:nearView={`page:${i}`}
 		>
 			<span class="scaler" style="transform:scale({thumbScale})">
@@ -393,8 +393,8 @@
 			<label>
 				<!-- Which side of the fold it is, with facing pages: its number's. -->
 				{#if template.facing}
-					<span class="side" title={sideAt(i) === 'recto' ? 'Recto — a right-hand page' : 'Verso — a left-hand page'}
-						>{sideAt(i) === 'recto' ? 'R' : 'V'}</span
+					<span class="side" title={sideAt(i) === 'recto' ? t('export.recto') : t('export.verso')}
+						>{sideAt(i) === 'recto' ? t('export.rectoLetter') : t('export.versoLetter')}</span
 					>
 				{/if}
 				<input
@@ -408,7 +408,7 @@
 	</figure>
 {/snippet}
 
-<div class="sheet-backdrop" role="dialog" aria-modal="true" aria-label="Export">
+<div class="sheet-backdrop" role="dialog" aria-modal="true" aria-label={t('export.title')}>
 	<!--
 		Two rows, each with one thing at either end and nothing in the middle to
 		align against: the name of the screen and the way out on the first, what
@@ -418,11 +418,11 @@
 	-->
 	<header>
 		<div class="header-row">
-			<h2>Export</h2>
+			<h2>{t('export.title')}</h2>
 			<!-- Unstyled, in the corner, where the lightbox puts its own: leaving
 			     is not one of the things you came here to do, and a button beside
 			     Print read as though it were. -->
-			<button class="close" onclick={onclose} title="Close" aria-label="Close">
+			<button class="close" onclick={onclose} title={t('common.close')} aria-label={t('common.close')}>
 				<Icon name="close" size={20} />
 			</button>
 		</div>
@@ -438,23 +438,19 @@
 			<p class="counts">
 				<button
 					class="count"
-					title="{chosen} of {dataset.rows.length} page{dataset.rows.length === 1 ? '' : 's'} going. Press to {allChosen
-						? 'clear them and choose'
-						: 'take all of them'}."
+					title={t(allChosen ? 'export.pagesAll' : 'export.pagesSome', { chosen, total: dataset.rows.length })}
 					onclick={() => setAll(!allChosen)}
 				>
-					{chosen} page{chosen === 1 ? '' : 's'}
+					{t('export.pages', { count: chosen })}
 				</button>
 				{#if imposed}
 					<span class="divider">/</span>
 					<button
 						class="count"
-						title="{chosenSheets} of {sheetGroups.length} sheet{sheetGroups.length === 1
-							? ''
-							: 's'} going. Press to {allSheetsChosen ? 'clear them and choose' : 'take all of them'}."
+						title={t(allSheetsChosen ? 'export.sheetsAll' : 'export.sheetsSome', { chosen: chosenSheets, total: sheetGroups.length })}
 						onclick={() => setAllSheets(!allSheetsChosen)}
 					>
-						{chosenSheets} sheet{chosenSheets === 1 ? '' : 's'}
+						{t('export.sheets', { count: chosenSheets })}
 					</button>
 				{/if}
 			</p>
@@ -463,15 +459,15 @@
 					<Icon name="download" size={15} />
 					{#if exporting}
 						{progress && progress.total > 1
-							? `Exporting ${Math.min(progress.done + 1, progress.total)}/${progress.total}…`
-							: 'Exporting…'}
+							? t('export.exportingCount', { done: Math.min(progress.done + 1, progress.total), total: progress.total })
+							: t('export.exporting')}
 					{:else}
-						PNG
+						{t('export.png')}
 					{/if}
 				</button>
-				<button class="primary" onclick={onprint} disabled={goingOut === 0} title={withKey('Print the pages that are going', 'export')}>
+				<button class="primary" onclick={onprint} disabled={goingOut === 0} title={withKey(t('export.printTitle'), 'export')}>
 					<Icon name="print" size={15} />
-					Print
+					{t('export.print')}
 				</button>
 			</div>
 		</div>
@@ -513,14 +509,14 @@
 		     frozen by its lock — and it turns only the files and the printed
 		     pages, so the previews here stay the way the template is drawn. -->
 		<label class="field output-turn">
-			<span>Output</span>
+			<span>{t('export.output')}</span>
 			<select
 				value={turn}
-				title="Which way round the PNGs and the printed pages come out. Auto follows the page settings; Portrait or Landscape turns them a quarter if they are not that way already. Kept in this browser, not in the template."
+				title={t('export.outputTitle')}
 				onchange={(e) => onturnchange(e.currentTarget.value as OutputTurn)}
 			>
 				{#each OUTPUT_TURNS as option (option)}
-					<option value={option}>{OUTPUT_TURN_NAMES[option]}</option>
+					<option value={option}>{t(OUTPUT_TURN_NAMES[option])}</option>
 				{/each}
 			</select>
 		</label>
@@ -531,11 +527,11 @@
 		<button
 			class="lock-toggle"
 			aria-pressed={pageFrozen}
-			title={pageFrozen ? 'Unlock the design' : 'Lock the design — no dragging, no option changes'}
+			title={pageFrozen ? t('design.unlockTitle') : t('design.lockTitle')}
 			onclick={() => ontemplatechange({ ...template, locked: pageFrozen ? undefined : true })}
 		>
 			<Icon name={pageFrozen ? 'unlocked' : 'locked'} size={14} />
-			{pageFrozen ? 'Unlock' : 'Lock'}
+			{pageFrozen ? t('design.unlock') : t('design.lock')}
 		</button>
 		<PrintSettingsPanel {template} {pageFrozen} {ontemplatechange} onuploadbackground={onuploadprintbackground} {onnotice} showFacing />
 	</div>
@@ -544,7 +540,7 @@
 		<!-- What Print (and a PNG export) will actually produce: the chosen cards
 		     above, tiled onto physical sheets exactly as PrintRoot.svelte renders
 		     them for real, only scaled down for the screen. -->
-		<section class="sheets" aria-label="Sheet preview">
+		<section class="sheets" aria-label={t('export.sheetPreview')}>
 			<div
 				class="grid sheet-grid"
 				class:narrow={sheetNarrow}
@@ -559,7 +555,7 @@
 							class="thumb sheet-thumb"
 							style="width:{mmToPx(printSheetW) * sheetThumbScale}px;height:{mmToPx(printSheetH) * sheetThumbScale}px"
 							onclick={() => (sheetFullscreen = i)}
-							aria-label="Open sheet {i + 1} full screen"
+							aria-label={t('export.openSheet', { number: i + 1 })}
 							use:nearView={`sheet:${i}`}
 						>
 							<span class="scaler" style="transform:scale({sheetThumbScale})">
@@ -587,7 +583,7 @@
 									checked={included}
 									onchange={(e) => toggleSheet(i, e.currentTarget.checked)}
 								/>
-								Sheet {i + 1}
+								{t('export.sheetNumber', { number: i + 1 })}
 							</label>
 						</figcaption>
 					</figure>
@@ -600,20 +596,20 @@
 
 	<!-- Under the pages, not above them: the cards are what you came to look at,
 	     and these four settings are what to do once you have. -->
-	<section class="checklist" aria-label="Before you print">
-		<h3>Before you print</h3>
+	<section class="checklist" aria-label={t('export.checklist.title')}>
+		<h3>{t('export.checklist.title')}</h3>
 		<ol>
 			<li>
-				<strong>Paper size</strong> — the one matching <strong>{paperW} × {paperH} mm</strong>, or a larger sheet you trim.
-				{#if imposed}{template.print.count} cards per sheet{imposed.scale < 0.999 ? `, scaled to ${Math.round(imposed.scale * 100)}%` : ''}.{/if}
+				<Msg id="export.checklist.paper" values={{ width: paperW, height: paperH }} />
+				{#if imposed}{imposed.scale < 0.999
+						? t('export.checklist.perSheetScaled', { count: template.print.count, percent: Math.round(imposed.scale * 100) })
+						: t('export.checklist.perSheet', { count: template.print.count })}{/if}
 			</li>
-			<li><strong>Margins</strong> — <em>None</em>.</li>
-			<li><strong>Headers and footers</strong> — off.</li>
-			<li><strong>Background graphics</strong> — on, or the browser drops the paper color.</li>
+			<li><Msg id="export.checklist.margins" /></li>
+			<li><Msg id="export.checklist.headers" /></li>
+			<li><Msg id="export.checklist.background" /></li>
 		</ol>
-		<p class="muted">
-			A PNG export needs none of this — it comes out at 300 dpi whatever the print dialog says.
-		</p>
+		<p class="muted">{t('export.checklist.png')}</p>
 	</section>
 
 	{#if fullscreen !== null}

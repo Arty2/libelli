@@ -4699,6 +4699,116 @@ produce a diff nobody reads, and bury every finding above inside it. If a
 formatter is ever wanted, that is a separate decision with its own one-time
 commit.
 
+## `src/lib/i18n.ts`, `src/lib/i18n/en.json` and `Msg.svelte`
+
+**Every word the interface shows is in one file.** A colleague who wants a
+tooltip worded differently, or a translator, opens `src/lib/i18n/en.json`
+and nothing else; the code asks for words by key and never spells them. The
+words on a card are not in it: those are the table's and the template's, in
+the card's language, which `lang.ts` sets and the template's CSS can speak to.
+`docs/translating.md` is the guide for whoever edits the file.
+
+**FormatJS's JSON layout, ICU's message syntax.** `{ key: { defaultMessage,
+description } }` is what FormatJS extracts and what Weblate, Crowdin,
+Lokalise, Phrase and Tolgee import as-is, so the description — where the
+words appear, what a value is — travels with each message into whatever tool
+does the translating. ICU MessageFormat is what those tools check and preview:
+`{count, plural, …}` and `{x, select, …}` keep a sentence whole, where the
+code used to glue an English `s` or a clause on in English order. A sentence
+is one message for the same reason: "Take the {which, select, …} from a
+column" can be reordered by a translator; "Take the " + what + " from a column"
+cannot.
+
+**The formatter is hand-written**, like the CSV parser — no runtime
+dependencies — and reads only as much ICU as the catalogue uses: values,
+`number`, `plural` with `=N` and `#`, `select`, rich-text tags and ICU's
+apostrophe quoting. Plural categories and digits come from `Intl.PluralRules`
+and `Intl.NumberFormat`, a list of names from `Intl.ListFormat`
+(`quotedList`), all Baseline Widely available. Parsed messages are cached by
+key; a message is parsed once per session.
+
+**Rich text without markup.** A message may wrap words in `<strong>`, `<em>`,
+`<kbd>` or `<code>`; `Msg.svelte` draws those four as elements, from a parsed
+tree, and draws any other tag as its words alone. The catalogue's text never
+reaches the page as HTML, so a translation cannot add an attribute, a link or a
+script, and `Msg` needs no `{@html}`. `t()` is the plain-text form, for
+attributes and the status line, and keeps the words of any tag. Where a
+message's words go into markup the app builds as a string — the barcode's and
+the QR code's screen-reader names — they are escaped on the way, for the same
+reason.
+
+**Maps hold keys, and are read at render.** `THEME_NAMES`, `KIND_LABELS`, the
+list-marker and leader labels, the blend modes and the page-number positions
+map a value to a `MessageKey`, and the component calls `t()` where it draws
+the label. A switcher, when there is one, then changes every label without a
+reload. Undo-step names are the exception: they are formatted when the step is
+recorded, in the language of that moment.
+
+**A missing word shows as its key, and the tests make sure it is never
+missing.** `t('table.rowsCopied')` with no such key draws `table.rowsCopied`,
+and a value nobody passed draws `{count}` — wrong, but visibly so. The
+catalogue's tests read every source file and assert that each key asked for
+exists, that each key in the file is asked for somewhere, that each message
+parses and uses only the four tags, and that a call passing its values as an
+object literal passes exactly the names the message reads — whether it names
+one key or chooses between keys with `?:`. A key looked up in a map
+(`t(LEADER_LABELS[x])`) is checked where the map is written, but not for its
+values; those maps hold labels that take none. The key type is
+`keyof typeof catalogue`, so `svelte-check` refuses an unknown key where it is
+written literally.
+
+**Gate 13 keeps it that way.** `scripts/ui-text.mjs` lists markup text outside
+`{…}`; a `title`, `aria-label`, `placeholder`, `alt` or `label` with words
+outside its `{…}`; in a component's script and its `{…}` expressions, any
+string literal that reads as a label — a capital, then letters — or as a
+fragment of three words or more spliced into a sentence (`'it is not valid
+JSON'`), so both branches of `cond ? 'Open' : 'Close'` are seen; and, in any file, a literal
+among the arguments of `notify`, `onnotice`, `describe`, `onaction`,
+`window.prompt`, `notes.push` or a `new …Error`, however the call wraps; and in
+a library module, an object's `label:` or `title:` written as a literal. A
+literal compared with `===`, named in `case`, passed to `includes(` or listed in
+an array that is only asked `.includes(…)` is the keyboard's or the platform's
+(`'Escape'`, `'Files'`) and is let be. Comments are read as comments by walking the
+code, strings included, so neither `accept="image/*"` in markup nor `'/*'` in a
+script opens one. What it still cannot see is a sentence in
+a library module kept in a variable and shown later; review catches those. A
+line that is never shown — the service worker's own log, the message parser's
+error for whoever edits the catalogue — says `ui-text: allow`.
+
+**The browser gets the words, not the notes.** A build-only Vite plugin
+(`vite.config.ts`) strips each `description` as `en.json` is bundled — a third
+of the file, written for translators, which no visitor reads. The tests and the
+dev server read the whole file.
+
+**Numbers read as they were given.** A plain `{n}` or `#` is drawn in the
+locale's digits with no grouping and no rounding, so a 1189mm sheet reads 1189,
+as the field beside it does, and a 0.0125mm tracking is not cut to 0.013.
+`{n, number}` is there for the full style when a message wants it.
+
+**A malformed message shows as its key.** A translator's typo, or ICU this
+reader does not know (`selectordinal`, `{n, number, percent}`), is logged and
+drawn as the key, as a missing one is, rather than throwing inside a
+component's render.
+
+**A name the app gives is the user's from then on.** "Untitled card", "New
+table" and "Getting Started" are written into the design or table in the
+interface's language when it is made, and stay so: a name is data a person
+renames, exports and sends, and a file that changed its own name when opened
+under another language would be stranger than one that keeps the name it was
+given. Names that are only shown — the starters in the Reset menus, a fallback
+for a nameless entry in a list — are read when shown, never cached at load.
+
+**One key per meaning, not per spelling.** Two places that say the same thing
+about the same thing share a key (the page's and the sheet's background buttons,
+Next card on the stage and in the lightbox). The same English for different
+things keeps two: "Color" as a blend mode and as a field label, "Solid" as a
+border and as a leader, Align Left for text and for areas — another language
+may need two words where English has one.
+
+**One language, and no switcher yet.** `LOCALE` is `'en'`. When a second
+language arrives, its file sits beside `en.json` with the same keys, and
+`LOCALE` comes from a setting; `t()`'s callers do not change.
+
 ## `scripts/gates.sh`
 
 **The rules a linter cannot see, made to execute.** `AGENTS.md` is a list of

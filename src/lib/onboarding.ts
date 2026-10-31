@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import sampleCsv from './sample-cards.csv?raw';
 import { parseTable } from './parse';
 import { builtinTemplate } from './template';
@@ -22,7 +23,7 @@ export const SAMPLE_CSV = sampleCsv;
  * is a worse answer to “what am I looking at” than the four cards themselves
  * give.
  */
-export const sampleDataset = (): Dataset => ({ ...parseTable(SAMPLE_CSV), name: 'Getting Started', starter: 'getting-started' });
+export const sampleDataset = (): Dataset => ({ ...parseTable(SAMPLE_CSV), name: t('name.gettingStarted'), starter: 'getting-started' });
 
 export const starterTemplate = (): Template => builtinTemplate();
 
@@ -38,10 +39,25 @@ export interface Starter<T> {
 }
 
 export const STARTER_TEMPLATES: Starter<Template>[] = [
-	{ id: 'a5-starter-booklet', name: 'A5 Starter Booklet', make: starterTemplate }
+	{
+		id: 'a5-starter-booklet',
+		// Read when asked, not when this module loads, so a menu follows the interface's language.
+		get name() {
+			return t('page.a5StarterBooklet');
+		},
+		make: starterTemplate
+	}
 ];
 
-export const STARTER_TABLES: Starter<Dataset>[] = [{ id: 'getting-started', name: 'Getting Started', make: sampleDataset }];
+export const STARTER_TABLES: Starter<Dataset>[] = [
+	{
+		id: 'getting-started',
+		get name() {
+			return t('name.gettingStarted');
+		},
+		make: sampleDataset
+	}
+];
 
 /**
  * The starter a copy names by its mark, and nothing else. It used to fall back

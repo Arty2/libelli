@@ -165,16 +165,6 @@ export function nudgeBox(box: Box, dx: number, dy: number): Box | null {
 export const H_ALIGN: Align[] = ['left', 'center', 'right', 'justify'];
 export const V_ALIGN: VAlign[] = ['top', 'middle', 'bottom'];
 
-export const ALIGN_LABELS: Record<string, string> = {
-	left: 'left',
-	center: 'centred',
-	right: 'right',
-	justify: 'justified',
-	top: 'top',
-	middle: 'middle',
-	bottom: 'bottom'
-};
-
 /** Where one box lands after a step along an axis, and whether that moved it. */
 export function stepAlignment(
 	box: Box,

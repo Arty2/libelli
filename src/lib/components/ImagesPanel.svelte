@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t, type MessageKey } from '$lib/i18n';
 	import type { Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
 	import MenuSelect, { familyItems } from './MenuSelect.svelte';
@@ -114,17 +115,17 @@
 	let fontOrder = $state<string[]>([]);
 
 	/** A kind of face, as the Type menu names it. */
-	const KIND_NAMES: Record<FontKind, string> = {
-		serif: 'Serif',
-		'sans-serif': 'Sans Serif',
-		monospace: 'Monospaced',
-		handwriting: 'Cursive'
+	const KIND_NAMES: Record<FontKind, MessageKey> = {
+		serif: 'fontKind.serif',
+		'sans-serif': 'fontKind.sansSerif',
+		monospace: 'fontKind.monospace',
+		handwriting: 'fontKind.handwriting'
 	};
 
 	/** Replace's first item: not a family — a name no family can have. */
 	const UPLOAD = '\u0000upload';
 	/** Plain: the picker takes every common font format, so naming them adds nothing. */
-	const UPLOAD_LABEL = 'Upload…';
+	const UPLOAD_LABEL: MessageKey = 'pictures.fontUpload';
 
 	/**
 	 * Each section's fold — `images`, `drawings`, `fonts` — as the person last
@@ -217,12 +218,12 @@
 	 * A family fetched from Google by name travels with the design, and says
 	 * nothing.
 	 */
-	const FONT_STATUS: Record<FontEntry['status'], string> = {
-		uploaded: 'local',
-		google: '',
-		system: '',
-		missing: 'missing',
-		unused: 'local · unused'
+	const FONT_STATUS: Record<FontEntry['status'], MessageKey | null> = {
+		uploaded: 'pictures.status.local',
+		google: null,
+		system: null,
+		missing: 'pictures.missing',
+		unused: 'pictures.status.unused'
 	};
 
 	/**
@@ -253,7 +254,7 @@
 		await storeLocalImage(file, name);
 		await refresh();
 		onchanged();
-		onnotice(replacingPresent ? `${name} is now ${file.name} — everything showing it shows the new one.` : `${name} is back, from ${file.name}.`);
+		onnotice(replacingPresent ? t('pictures.replaced', { name, file: file.name }) : t('pictures.restored', { name, file: file.name }));
 	}
 
 	/**
@@ -335,7 +336,7 @@
 			if (run !== refreshes) return;
 			busy = false;
 			reading = false;
-			onnotice('The pictures kept in this browser could not be read — the list may be out of date.', 'warning');
+			onnotice(t('pictures.readFailed'), 'warning');
 			return;
 		}
 		if (run !== refreshes) return;
@@ -377,7 +378,7 @@
 			// the rest may no longer be there to delete or replace.
 			if (run !== refreshes) return;
 			inFolder = found;
-			onnotice(`${folder?.name ?? 'The folder'} could not be read to the end — it may have been moved or renamed.`, 'warning');
+			onnotice(t('pictures.folderReadFailed', { folder: folder?.name ?? t('pictures.folderFallback') }), 'warning');
 		} finally {
 			if (run === refreshes) {
 				busy = false;
@@ -404,9 +405,7 @@
 		for (const file of files) names.push(await storeLocalImage(file));
 		await refresh();
 		onchanged();
-		onnotice(
-			`${names.length === 1 ? names[0] : `${names.length} images`} added. Drag ${names.length === 1 ? 'it' : 'one'} onto an area to put it there, or onto the page for an area of its own.`
-		);
+		onnotice(t('pictures.added', { count: names.length, name: names[0] }));
 	}
 
 	/**
@@ -467,7 +466,7 @@
 		if (area?.dataset.boxId) onplace(area.dataset.boxId, name);
 		else if (document.elementFromPoint(event.clientX, event.clientY)?.closest('.viewport .sheet'))
 			onplacepage(name, event.clientX, event.clientY);
-		else onnotice('Let go over the page to put the image on it — over an area to put it in that one.');
+		else onnotice(t('pictures.dropMiss'));
 	}
 
 	$effect(() => {
@@ -553,7 +552,7 @@
 		// Another folder: the list held is the last one's, and kept up while
 		// this one is read it would offer to delete files under its name here.
 		inFolder = [];
-		onnotice(`Images go into ${chosen.name} from now on. The ones already in this browser stay where they are.`);
+		onnotice(t('pictures.folderChosen', { folder: chosen.name }));
 		await refresh();
 		onchanged();
 	}
@@ -561,7 +560,7 @@
 	async function reopen() {
 		const state = await reopenImageFolder();
 		if (!state?.ready) {
-			onnotice('That folder was not opened, so images are coming from this browser.', 'warning');
+			onnotice(t('pictures.folderNotOpened'), 'warning');
 			return;
 		}
 		await refresh();
@@ -570,7 +569,7 @@
 
 	async function forget() {
 		await forgetImageFolder();
-		onnotice('Folder disconnected. Nothing in it was deleted — this app has simply stopped reading it.');
+		onnotice(t('pictures.folderDisconnected'));
 		await refresh();
 		onchanged();
 	}
@@ -583,10 +582,7 @@
 		else held = held.filter((i) => i.name !== image.name);
 		// Deleted from its own large view: there is nothing left to look at.
 		if (image.name === focus) onfocus?.(null);
-		onnotice(
-			`${image.name} deleted.` +
-				(used.has(image.name) ? ' The areas pointing at it will draw nothing until it is put back.' : '')
-		);
+		onnotice(t(used.has(image.name) ? 'pictures.deletedInUse' : 'pictures.deleted', { name: image.name }));
 		await refresh();
 		onchanged();
 	}
@@ -730,14 +726,14 @@
 			// instead, and a PNG under a .webp name is a file that lies about
 			// itself. Refused rather than written.
 			if (!blob || blob.type !== type) {
-				onnotice(`This browser cannot write ${type.replace('image/', '').toUpperCase()} files, so ${name} was left as it was.`, 'warning');
+				onnotice(t('pictures.cannotWrite', { type: type.replace('image/', '').toUpperCase(), name }), 'warning');
 				return;
 			}
 			await storeLocalImage(new File([blob], name, { type }), name);
 			dirty = false;
 			await refresh();
 			onchanged();
-			onnotice(`${name} saved — every card showing it shows the edit.`);
+			onnotice(t('pictures.saved', { name }));
 		} finally {
 			saving = false;
 		}
@@ -763,7 +759,7 @@
 	is stored and what it weighs at the top; the ways in on the Images head,
 	since they are the images' alone.
 -->
-<section class="images-tray" aria-label="Pictures">
+<section class="images-tray" aria-label={t('pictures.title')}>
 	<!-- The head is also the tray's grip on a phone, as the table's header
 	     row is: pulled up or down, it shares the height with the page. -->
 	<div
@@ -778,32 +774,32 @@
 		{#if focus}
 			<button
 				class="back"
-				title={dirty ? 'Save or revert the edit first' : 'Back to every image'}
-				aria-label="Back to every image"
+				title={dirty ? t('pictures.saveFirst') : t('pictures.backToAll')}
+				aria-label={t('pictures.backToAll')}
 				disabled={dirty}
 				onclick={() => onfocus?.(null)}
 			><Icon name="chevron-left" size={14} /></button>
 			<span class="context focus-name" title={focus}>{focus}</span>
 			<!-- The size as it stands, edits and all: a crop is judged by it. -->
 			{#if focusType && dims.w}
-				<span class="total">{dims.w} × {dims.h} px</span>
+				<span class="total">{t('pictures.pixelSize', { width: dims.w, height: dims.h })}</span>
 			{:else if sizes[focus]}
-				<span class="total">{sizes[focus].w} × {sizes[focus].h} px</span>
+				<span class="total">{t('pictures.pixelSize', { width: sizes[focus].w, height: sizes[focus].h })}</span>
 			{/if}
-			{#if dirty}<span class="tag">edited</span>{/if}
+			{#if dirty}<span class="tag">{t('pictures.edited')}</span>{/if}
 		{:else}
-		<span class="context">Pictures</span>
+		<span class="context">{t('pictures.title')}</span>
 		{/if}
 		{#if images.length >= FILTER_FROM && !focus}
 			<!-- One box: the field and its button inside a single border. The
 			     list narrows as it is typed, so the button only puts the caret
 			     in the field — it is there to say what the field is for. -->
 			<label class="search">
-				<span class="sr-only">Search the images</span>
-				<input type="search" placeholder="Search…" bind:value={filter} bind:this={searchInput} />
+				<span class="sr-only">{t('pictures.search')}</span>
+				<input type="search" placeholder={t('pictures.searchPlaceholder')} bind:value={filter} bind:this={searchInput} />
 				<button
-					title="Search the images"
-					aria-label="Search the images"
+					title={t('pictures.search')}
+					aria-label={t('pictures.search')}
 					onclick={(e) => {
 						e.preventDefault();
 						searchInput?.focus();
@@ -818,9 +814,9 @@
 		<div class="viewer" bind:clientWidth={room.w} bind:clientHeight={room.h}>
 			{#if !focusUrl}
 				<p class="empty">
-					{busy || reading ? '…' : `${focus} is not in this browser.`}
+					{busy || reading ? '…' : t('pictures.notInBrowser', { name: focus })}
 					{#if !busy && !reading && missing.includes(focus)}
-						<button class="find" onclick={() => findFor(focus!)}><Icon name="image-reference" size={13} /> Find…</button>
+						<button class="find" onclick={() => findFor(focus!)}><Icon name="image-reference" size={13} /> {t('pictures.find')}</button>
 					{/if}
 				</p>
 			{:else if !focusType}
@@ -869,7 +865,7 @@
 		     its far end, rather than in a bar under every section. Upload is
 		     every browser's, a phone included; the folder is Chromium's. -->
 		{#snippet imageWays()}
-			<button class="square save" title="Upload images from this device" aria-label="Upload images" onclick={() => fileInput?.click()}>
+			<button class="square save" title={t('pictures.uploadTitle')} aria-label={t('pictures.upload')} onclick={() => fileInput?.click()}>
 				<Icon name="upload" size={12} />
 			</button>
 			<!-- Once one is connected, the folder's own line carries it. Shown
@@ -879,10 +875,8 @@
 				<button
 					class="square save"
 					disabled={!available}
-					title={available
-						? "Keep images as ordinary files in a folder of your own, rather than in this browser's storage"
-						: 'A folder of your own needs Chrome or Edge on a computer — this browser cannot keep images in one, so they stay in its own storage'}
-					aria-label="Connect a folder"
+					title={available ? t('pictures.connectFolderTitle') : t('pictures.folderUnavailable')}
+					aria-label={t('pictures.connectFolder')}
 					onclick={choose}><Icon name="folder-add" size={12} /></button
 				>
 			{/if}
@@ -896,15 +890,20 @@
 			<li
 				class:unused={!used.has(image.name)}
 				class:in-folder={image.where === 'folder'}
-				title="{image.name} — {image.where === 'folder' ? `in ${folder?.name ?? 'the folder'}` : 'in this browser'}, {used.has(image.name) ? 'in use' : 'unused'}"
+				title={t('pictures.rowTitle', {
+					name: image.name,
+					where: image.where,
+					folder: folder?.name ?? t('pictures.folderFallback'),
+					used: used.has(image.name) ? 'yes' : 'no'
+				})}
 			>
 				<span
 					class="thumb"
 					class:carrying={carry?.on && carry.name === image.name}
 					role="button"
 					tabindex="-1"
-					aria-label="Drag {image.name} onto an area"
-					title="Drag onto an area, or onto the page for an area of its own"
+					aria-label={t('pictures.dragLabel', { name: image.name })}
+					title={t('pictures.dragTitle')}
 					onpointerdown={(e) => startCarry(e, image.name)}
 					onpointermove={moveCarry}
 					onpointerup={endCarry}
@@ -926,19 +925,19 @@
 				</span>
 				<span class="name">{image.name}</span>
 				<span class="size">{[
-					sizes[image.name] ? `${sizes[image.name].w} × ${sizes[image.name].h} px` : '',
+					sizes[image.name] ? t('pictures.pixelSize', { width: sizes[image.name].w, height: sizes[image.name].h }) : '',
 					weigh(image.bytes)
 				]
 					.filter(Boolean)
 					.join(' · ')}</span>
-				{#if !used.has(image.name)}<span class="tag">unused</span>{/if}
+				{#if !used.has(image.name)}<span class="tag">{t('pictures.unused')}</span>{/if}
 				<!-- A new file under the same name: every card and page that shows
 				     this picture shows the new one, with nothing to re-point. The
 				     arrow out of a tray, as a font's upload is. -->
 				<button
 					class="square save"
-					title="Replace {image.name} with another file, under the same name — everything showing it shows the new one"
-					aria-label="Replace {image.name}"
+					title={t('pictures.replaceTitle', { name: image.name })}
+					aria-label={t('pictures.replace', { name: image.name })}
 					onclick={() => findFor(image.name, true)}
 				>
 					<Icon name="upload" size={12} />
@@ -946,8 +945,8 @@
 				{#if image.url}
 					<button
 						class="square save"
-						title="Download {image.name}"
-						aria-label="Download {image.name}"
+						title={t('pictures.download', { name: image.name })}
+						aria-label={t('pictures.download', { name: image.name })}
 						onclick={() => downloadUrl(image.name, image.url!)}
 					>
 						<Icon name="download" size={12} />
@@ -955,8 +954,8 @@
 				{/if}
 				<button
 					class="square"
-					title="Delete {image.name}"
-					aria-label="Delete {image.name}"
+					title={t('pictures.delete', { name: image.name })}
+					aria-label={t('pictures.delete', { name: image.name })}
 					onclick={() => (confirming = image)}
 				>
 					<Icon name="trash" size={12} />
@@ -967,10 +966,10 @@
 			<p class="empty">…</p>
 		{:else}
 			<!-- The head is there with none, for its ways in. -->
-			{@render sectionHead('images', 'Images', `${images.length + missing.length}${images.length ? ` · ${weigh(total)}` : ''}`, imageWays)}
+			{@render sectionHead('images', t('pictures.images'), `${images.length + missing.length}${images.length ? ` · ${weigh(total)}` : ''}`, imageWays)}
 			{#if !isFolded('images')}
 			{#if !images.length && !missing.length && !folder}
-				<p class="empty">No images yet — upload one, or drop it on an area.</p>
+				<p class="empty">{t('pictures.none')}</p>
 			{/if}
 			<ul class="images">
 				<!-- The folder is one line — its name, how many, what they weigh —
@@ -984,17 +983,17 @@
 							aria-expanded={folder.ready ? folderShown : undefined}
 							disabled={!folder.ready}
 							title={folder.ready
-								? `${folderShown ? 'Fold' : 'Show'} the images in ${folder.name}`
-								: `${folder.name} is not open — the browser asks again after a restart`}
+								? t(folderShown ? 'pictures.folderFold' : 'pictures.folderShow', { folder: folder.name })
+								: t('pictures.folderShut', { folder: folder.name })}
 							onclick={toggleFolder}
 						>
 							<span class="thumb folder-thumb" aria-hidden="true"><Icon name="folder" size={16} /></span>
 							<span class="name">{folder.name}</span>
 							<span class="size">
 								{#if !folder.ready}
-									not opened
+									{t('pictures.folderNotOpened.tag')}
 								{:else if reading}
-									{shownFolder.length ? `${shownFolder.length} so far…` : 'reading…'}
+									{shownFolder.length ? t('pictures.soFar', { count: shownFolder.length }) : t('pictures.reading')}
 								{:else}
 									{shownFolder.length}{folderTotal ? ` · ${weigh(folderTotal)}` : ''}
 								{/if}
@@ -1004,20 +1003,20 @@
 							{/if}
 						</button>
 						{#if available && !folder.ready}
-							<button class="open-folder" title="Open {folder.name} again, to read the images in it" onclick={reopen}>Open</button>
+							<button class="open-folder" title={t('pictures.openTitle', { folder: folder.name })} onclick={reopen}>{t('pictures.open')}</button>
 						{/if}
 						{#if available}
 							<button
 								class="square save"
-								title="Another folder — images are kept in {folder.name} now"
-								aria-label="Choose another folder"
+								title={t('pictures.otherFolderTitle', { folder: folder.name })}
+								aria-label={t('pictures.otherFolder')}
 								onclick={choose}><Icon name="folder" size={12} /></button
 							>
 						{/if}
 						<button
 							class="square"
-							title="Disconnect {folder.name}. Nothing in it is deleted; new images go into this browser"
-							aria-label="Disconnect {folder.name}"
+							title={t('pictures.disconnectTitle', { folder: folder.name })}
+							aria-label={t('pictures.disconnect', { folder: folder.name })}
 							onclick={forget}><Icon name="unlink" size={12} /></button
 						>
 					</li>
@@ -1031,12 +1030,12 @@
 					{@render imageRow(image)}
 				{/each}
 				{#each missing as name (name)}
-					<li class="missing" title="{name} — pointed at, but not in this browser">
+					<li class="missing" title={t('pictures.missingTitle', { name })}>
 						<span class="thumb empty-thumb" aria-hidden="true"><Icon name="image" size={16} /></span>
 						<span class="name">{name}</span>
-						<span class="tag missing-tag">missing</span>
-						<button class="find" title="Choose the file to use for {name}" onclick={() => findFor(name)}>
-							<Icon name="image-reference" size={13} /> Find…
+						<span class="tag missing-tag">{t('pictures.missing')}</span>
+						<button class="find" title={t('pictures.findFor', { name })} onclick={() => findFor(name)}>
+							<Icon name="image-reference" size={13} /> {t('pictures.find')}
 						</button>
 					</li>
 				{/each}
@@ -1047,12 +1046,12 @@
 			<!-- The pictures kept in the table itself, and on areas with no
 			     column: not files, so nothing to delete or carry here — a press
 			     opens one to draw on, in the side panel. -->
-			{@render sectionHead('drawings', 'Drawings', `${drawings.length} · ${weigh(drawings.reduce((sum, d) => sum + d.src.length * 0.75, 0))}`)}
+			{@render sectionHead('drawings', t('pictures.drawings'), `${drawings.length} · ${weigh(drawings.reduce((sum, d) => sum + d.src.length * 0.75, 0))}`)}
 			{#if !isFolded('drawings')}
 			<ul class="images">
 				{#each drawings as drawing (drawing.key)}
 					<li>
-						<button class="drawing as-typed" title="Open {drawing.label}, {drawing.where}, to draw on" onclick={() => onopendrawing?.(drawing.key)}>
+						<button class="drawing as-typed" title={t('pictures.openDrawing', { label: drawing.label, where: drawing.where })} onclick={() => onopendrawing?.(drawing.key)}>
 							<span class="thumb pixels">
 								<img
 									src={drawing.src}
@@ -1066,7 +1065,7 @@
 							</span>
 							<span class="name">{drawing.label} <span class="where-in">{drawing.where}</span></span>
 							<span class="size">{[
-								drawnSizes[drawing.key] ? `${drawnSizes[drawing.key].w} × ${drawnSizes[drawing.key].h} px` : '',
+								drawnSizes[drawing.key] ? t('pictures.pixelSize', { width: drawnSizes[drawing.key].w, height: drawnSizes[drawing.key].h }) : '',
 								weigh(drawing.src.length * 0.75)
 							]
 								.filter(Boolean)
@@ -1074,8 +1073,8 @@
 						</button>
 						<button
 							class="square save"
-							title="Download {drawingFile(drawing)}"
-							aria-label="Download {drawing.label}, {drawing.where}"
+							title={t('pictures.download', { name: drawingFile(drawing) })}
+							aria-label={t('pictures.downloadDrawing', { label: drawing.label, where: drawing.where })}
 							onclick={() => downloadUrl(drawingFile(drawing), drawing.src)}
 						>
 							<Icon name="download" size={12} />
@@ -1091,7 +1090,7 @@
 			     to another computer finds a local face missing: here it says so.
 			     Any font can be given a file under its own name, or swapped for
 			     another everywhere it is used. -->
-			{@render sectionHead('fonts', 'Fonts', `${fonts.length}${fonts.some((f) => f.bytes) ? ` · ${weigh(fonts.reduce((sum, f) => sum + (f.bytes ?? 0), 0))}` : ''}`)}
+			{@render sectionHead('fonts', t('pictures.fonts'), `${fonts.length}${fonts.some((f) => f.bytes) ? ` · ${weigh(fonts.reduce((sum, f) => sum + (f.bytes ?? 0), 0))}` : ''}`)}
 			{#if !isFolded('fonts')}
 			<ul class="images fonts">
 				{#each shownFonts as font (font.family)}
@@ -1108,7 +1107,7 @@
 								class="name font-name"
 								style="font-family:{fontStack(font.family, font.kind)}"
 								aria-expanded={font.family.toLowerCase() === outlinedFont}
-								title="{font.family}: what kind of face it is, for the one that stands in where it is missing"
+								title={t('pictures.fontKindTitle', { family: font.family })}
 								onclick={() => (outlinedFont = font.family.toLowerCase() === outlinedFont ? null : font.family.toLowerCase())}
 							>{font.family}</button>
 						{:else}
@@ -1116,7 +1115,7 @@
 						{/if}
 						<span class="size">{font.bytes ? weigh(font.bytes) : ''}</span>
 						{#if FONT_STATUS[font.status]}
-							<span class="tag" class:missing-tag={font.status === 'missing'}>{FONT_STATUS[font.status]}</span>
+							<span class="tag" class:missing-tag={font.status === 'missing'}>{t(FONT_STATUS[font.status]!)}</span>
 						{/if}
 						<!-- What kind of face it is, for the fallback a card names after it
 						     where the face is missing — on the outlined row, between the
@@ -1128,15 +1127,15 @@
 							     ruled off from the kinds. -->
 							<select
 								class="kind"
-								aria-label="Type of {font.family}, for its fallback"
-								title="What kind of face {font.family} is: where it is missing, a face of this kind stands in"
+								aria-label={t('pictures.fontType', { family: font.family })}
+								title={t('pictures.fontTypeTitle', { family: font.family })}
 								value={font.fallback ?? ''}
 								onchange={(e) => ontune?.(font.family, { fallback: (e.currentTarget.value || undefined) as FontKind | undefined })}
 							>
-								<option value="">Auto ({KIND_NAMES[font.detected ?? 'sans-serif']})</option>
+								<option value="">{t('pictures.fontAuto', { kind: t(KIND_NAMES[font.detected ?? 'sans-serif']) })}</option>
 								<hr />
 								{#each FONT_KINDS as kind (kind)}
-									<option value={kind}>{KIND_NAMES[kind]}</option>
+									<option value={kind}>{t(KIND_NAMES[kind])}</option>
 								{/each}
 							</select>
 						{/if}
@@ -1147,14 +1146,14 @@
 								     Google one made local — then every other face to swap it
 								     for, what this computer has before what must be fetched. -->
 								<MenuSelect
-									label="Replace {font.family} with"
-									title="Upload a file for {font.family}, or set everything in it in another font instead"
-									placeholder="Replace"
+									label={t('pictures.replaceFontLabel', { family: font.family })}
+									title={t('pictures.replaceFontTitle', { family: font.family })}
+									placeholder={t('pictures.replaceFontPlaceholder')}
 									value=""
 									items={[
 										font.status === 'system'
-											? { value: UPLOAD, label: UPLOAD_LABEL, disabled: true, title: `${font.family} is a system font — it is on the computer already, so there is no file to upload` }
-											: { value: UPLOAD, label: UPLOAD_LABEL, title: `A font file (TTF, OTF, WOFF or WOFF2) to use as ${font.family}, installed in this browser under this name` },
+											? { value: UPLOAD, label: t(UPLOAD_LABEL), disabled: true, title: t('pictures.systemFontNoFile', { family: font.family }) }
+											: { value: UPLOAD, label: t(UPLOAD_LABEL), title: t('pictures.fontFileTitle', { family: font.family }) },
 										{ rule: true },
 										...familyItems(fontFamilies, font.family, ['local', 'system', 'google'], true)
 									]}
@@ -1168,8 +1167,8 @@
 						{#if !font.used}
 							<button
 								class="square save"
-								title="Upload a font file to use as {font.family} — installed in this browser under this name"
-								aria-label="Upload a file for {font.family}"
+								title={t('pictures.uploadFontTitle', { family: font.family })}
+								aria-label={t('pictures.uploadFont', { family: font.family })}
 								onclick={() => chooseFontFile(font.family)}
 							>
 								<Icon name="upload" size={12} />
@@ -1178,8 +1177,8 @@
 						{#if !font.used && font.status === 'unused'}
 							<button
 								class="square"
-								title="Delete {font.family} from this browser — nothing in this design is set in it"
-								aria-label="Delete {font.family}"
+								title={t('pictures.deleteFontTitle', { family: font.family })}
+								aria-label={t('pictures.delete', { name: font.family })}
 								onclick={() => (confirmingFont = font)}
 							>
 								<Icon name="trash" size={12} />
@@ -1203,15 +1202,15 @@
 	{#if focus && focusType && focusUrl}
 		<!-- What can be done to it, in a row under it as the drawing editor has
 		     its tools: turn it, mirror it, crop it to a frame drawn over it. -->
-		<div class="tools" role="toolbar" aria-label="Image tools">
+		<div class="tools" role="toolbar" aria-label={t('pictures.tools')}>
 			<span class="segmented">
-				<button title="Turn a quarter turn clockwise" aria-label="Rotate" onclick={turn}><Icon name="rotate" size={16} /></button>
-				<button title="Flip left to right" aria-label="Flip horizontally" onclick={() => flip('x')}><Icon name="reflect-horizontal" size={16} /></button>
-				<button title="Flip upside down" aria-label="Flip vertically" onclick={() => flip('y')}><Icon name="reflect-vertical" size={16} /></button>
+				<button title={t('pictures.rotateTitle')} aria-label={t('draw.rotate')} onclick={turn}><Icon name="rotate" size={16} /></button>
+				<button title={t('pictures.flipXTitle')} aria-label={t('draw.flipX')} onclick={() => flip('x')}><Icon name="reflect-horizontal" size={16} /></button>
+				<button title={t('pictures.flipYTitle')} aria-label={t('draw.flipY')} onclick={() => flip('y')}><Icon name="reflect-vertical" size={16} /></button>
 				<button
 					aria-pressed={cropping}
-					title={cropping ? 'Stop cropping' : 'Crop — drag a frame over the image'}
-					aria-label="Crop"
+					title={cropping ? t('draw.stopCropping') : t('pictures.cropTitle')}
+					aria-label={t('draw.crop')}
 					onclick={() => {
 						cropping = !cropping;
 						frame = null;
@@ -1219,7 +1218,7 @@
 				><Icon name="crop" size={16} /></button>
 			</span>
 			{#if cropping}
-				<button class="apply" disabled={!isCrop(frame)} title="Keep only what is inside the frame" onclick={applyCrop}>Apply Crop</button>
+				<button class="apply" disabled={!isCrop(frame)} title={t('draw.applyCropTitle')} onclick={applyCrop}>{t('draw.applyCrop')}</button>
 			{/if}
 		</div>
 	{/if}
@@ -1229,16 +1228,20 @@
 		     or going back to what is stored. The pager steps through the
 		     list in its own order, once nothing is waiting to be saved. -->
 		<div class="actions">
-			<span class="pager" role="group" aria-label="Image">
-				<button class="step" title={dirty ? 'Save or revert the edit first' : 'Previous image'} aria-label="Previous image" disabled={dirty || focusIndex <= 0} onclick={() => step(-1)}><Icon name="chevron-left" size={16} /></button>
-				<span class="count">{focusIndex + 1} / {shown.length}</span>
-				<button class="step" title={dirty ? 'Save or revert the edit first' : 'Next image'} aria-label="Next image" disabled={dirty || focusIndex < 0 || focusIndex >= shown.length - 1} onclick={() => step(1)}><Icon name="chevron-right" size={16} /></button>
+			<span class="pager" role="group" aria-label={t('pictures.pager')}>
+				<button class="step" title={dirty ? t('pictures.saveFirst') : t('pictures.previous')} aria-label={t('pictures.previous')} disabled={dirty || focusIndex <= 0} onclick={() => step(-1)}><Icon name="chevron-left" size={16} /></button>
+				<span class="count">{t('common.counter', { index: focusIndex + 1, total: shown.length })}</span>
+				<button class="step" title={dirty ? t('pictures.saveFirst') : t('pictures.next')} aria-label={t('pictures.next')} disabled={dirty || focusIndex < 0 || focusIndex >= shown.length - 1} onclick={() => step(1)}><Icon name="chevron-right" size={16} /></button>
 			</span>
 			{#if focusType && focusUrl}
 				<span class="spacer"></span>
-				<button disabled={!dirty} title="Back to the image as it is stored" onclick={() => focusUrl && load(focusUrl)}>Revert</button>
+				<button disabled={!dirty} title={t('pictures.revertTitle')} onclick={() => focusUrl && load(focusUrl)}>{t('pictures.revert')}</button>
 			{:else if focusUrl}
-				<span class="note">Shown only — this browser cannot write {focus.split('.').pop()?.toUpperCase() || 'this kind of'} files.</span>
+				<span class="note"
+					>{focus.split('.').pop()
+						? t('pictures.readOnlyType', { type: focus.split('.').pop()!.toUpperCase() })
+						: t('pictures.readOnlyUnknown')}</span
+				>
 				<span class="spacer"></span>
 			{:else}
 				<span class="spacer"></span>
@@ -1246,11 +1249,11 @@
 			<!-- Delete and Save at the far end, as a drawing has them in the
 			     table: the two things done to the picture itself. Delete asks
 			     first, as it does from the list. -->
-			<button class="danger" disabled={!focusRecord} title="Delete {focus}" onclick={() => focusRecord && (confirming = focusRecord)}>
-				<Icon name="trash" size={15} /> Delete
+			<button class="danger" disabled={!focusRecord} title={t('pictures.delete', { name: focus })} onclick={() => focusRecord && (confirming = focusRecord)}>
+				<Icon name="trash" size={15} /> {t('common.delete')}
 			</button>
 			{#if focusType && focusUrl}
-				<button class="primary" disabled={!dirty || saving} title="Write the edit over {focus}" onclick={save}>Save</button>
+				<button class="primary" disabled={!dirty || saving} title={t('pictures.saveTitle', { name: focus })} onclick={save}>{t('common.save')}</button>
 			{/if}
 		</div>
 	{/if}
@@ -1276,15 +1279,15 @@
 			if (e.key === 'Escape') confirming = null;
 		}}
 	>
-		<h2 id="delete-image-title">Delete “{image.name}”?</h2>
+		<h2 id="delete-image-title">{t('pictures.confirmDelete.title', { name: image.name })}</h2>
 		<p>
-			It is removed from {image.where === 'folder' ? 'the folder' : 'this browser'}, and this cannot be undone.
+			{t('pictures.confirmDelete.body', { where: image.where })}
 			{#if used.has(image.name)}
-				Something on this card or in this table uses it, and will draw nothing until it is put back.
+				{t('pictures.confirmDelete.inUse')}
 			{/if}
 		</p>
 		<div class="confirm-actions">
-			<button onclick={() => (confirming = null)}>Cancel</button>
+			<button onclick={() => (confirming = null)}>{t('common.cancel')}</button>
 			<button
 				class="danger-solid"
 				data-default
@@ -1294,7 +1297,7 @@
 					const doomed = image;
 					confirming = null;
 					void remove(doomed);
-				}}>Delete Image</button
+				}}>{t('pictures.confirmDelete.button')}</button
 			>
 		</div>
 	</div>
@@ -1315,13 +1318,10 @@
 			if (e.key === 'Escape') confirmingFont = null;
 		}}
 	>
-		<h2 id="delete-font-title">Delete “{font.family}”?</h2>
-		<p>
-			It is removed from this browser, and this cannot be undone. Nothing in this design is set in it, but
-			another design in your library may be, and would find it missing until the file is chosen again.
-		</p>
+		<h2 id="delete-font-title">{t('pictures.confirmDeleteFont.title', { family: font.family })}</h2>
+		<p>{t('pictures.confirmDeleteFont.body')}</p>
 		<div class="confirm-actions">
-			<button onclick={() => (confirmingFont = null)}>Cancel</button>
+			<button onclick={() => (confirmingFont = null)}>{t('common.cancel')}</button>
 			<button
 				class="danger-solid"
 				data-default
@@ -1329,7 +1329,7 @@
 					const doomed = font;
 					confirmingFont = null;
 					ondeletefont?.(doomed);
-				}}>Delete Font</button
+				}}>{t('pictures.confirmDeleteFont.button')}</button
 			>
 		</div>
 	</div>

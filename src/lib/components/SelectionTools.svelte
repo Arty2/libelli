@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t, type MessageKey } from '$lib/i18n';
 	import Icon from './Icon.svelte';
 	import { withKey } from '$lib/keys';
 	import type { AlignEdge } from '$lib/layout';
@@ -28,13 +29,13 @@
 		boxes.length > 1 && boxes.every((b) => b.group) && new Set(boxes.map((b) => b.group)).size === 1
 	);
 
-	const ALIGN_EDGES: Array<{ value: AlignEdge; icon: string; label: string }> = [
-		{ value: 'left', icon: 'obj-left', label: 'Align Left' },
-		{ value: 'centre-x', icon: 'obj-centre-x', label: 'Centre Horizontally' },
-		{ value: 'right', icon: 'obj-right', label: 'Align Right' },
-		{ value: 'top', icon: 'obj-top', label: 'Align Top' },
-		{ value: 'centre-y', icon: 'obj-centre-y', label: 'Centre Vertically' },
-		{ value: 'bottom', icon: 'obj-bottom', label: 'Align Bottom' }
+	const ALIGN_EDGES: Array<{ value: AlignEdge; icon: string; label: MessageKey }> = [
+		{ value: 'left', icon: 'obj-left', label: 'align.left' },
+		{ value: 'centre-x', icon: 'obj-centre-x', label: 'align.centreX' },
+		{ value: 'right', icon: 'obj-right', label: 'align.right' },
+		{ value: 'top', icon: 'obj-top', label: 'align.top' },
+		{ value: 'centre-y', icon: 'obj-centre-y', label: 'align.centreY' },
+		{ value: 'bottom', icon: 'obj-bottom', label: 'align.bottom' }
 	];
 </script>
 
@@ -42,12 +43,12 @@
      more than one box chosen, so they belong beside the page rather than
      pushing the options bar around every time a second box is picked up. Icons
      only — the count and the wording live in the right-click menu. -->
-<div class="tools {place}" role="toolbar" aria-label="Selection" aria-orientation="vertical">
+<div class="tools {place}" role="toolbar" aria-label={t('selection.label')} aria-orientation="vertical">
 	<span class="count act" aria-hidden="true">{boxes.length}</span>
 
 	{#if place === 'rail'}
 		{#each ALIGN_EDGES as option (option.value)}
-			<button title={option.label} aria-label={option.label} disabled={frozen} onclick={() => onalign(option.value)}>
+			<button title={t(option.label)} aria-label={t(option.label)} disabled={frozen} onclick={() => onalign(option.value)}>
 				<Icon name={option.icon} size={16} />
 			</button>
 		{/each}
@@ -58,8 +59,8 @@
 	<button
 		class="act"
 		aria-pressed={grouped}
-		title={grouped ? 'Ungroup' : 'Group — move, lock and delete these as one'}
-		aria-label={grouped ? 'Ungroup' : 'Group'}
+		title={grouped ? t('selection.ungroup') : t('selection.groupTitle')}
+		aria-label={grouped ? t('selection.ungroup') : t('selection.group')}
 		disabled={frozen}
 		onclick={ongroup}
 	>
@@ -68,8 +69,8 @@
 	<button
 		class="act"
 		aria-pressed={allLocked}
-		title={allLocked ? 'Unlock all of them' : 'Lock all of them'}
-		aria-label={allLocked ? 'Unlock' : 'Lock'}
+		title={allLocked ? t('selection.unlockAll') : t('selection.lockAll')}
+		aria-label={allLocked ? t('selection.unlock') : t('selection.lock')}
 		disabled={frozen}
 		onclick={onlock}
 	>
@@ -78,11 +79,11 @@
 	<!-- Not on a phone: there it is in the area's menu, a long press away, and
 	     the side column has room for the few a set is most often used for. -->
 	{#if place === 'rail'}
-		<button class="act" title={withKey('Duplicate', 'duplicate')} aria-label="Duplicate" disabled={frozen} onclick={onduplicate}>
+		<button class="act" title={withKey(t('selection.duplicate'), 'duplicate')} aria-label={t('selection.duplicate')} disabled={frozen} onclick={onduplicate}>
 			<Icon name="replicate" size={16} />
 		</button>
 	{/if}
-	<button class="act danger" title={withKey('Delete', 'delete')} aria-label="Delete" disabled={frozen || allLocked} onclick={ondelete}>
+	<button class="act danger" title={withKey(t('selection.delete'), 'delete')} aria-label={t('selection.delete')} disabled={frozen || allLocked} onclick={ondelete}>
 		<Icon name="trash" size={16} />
 	</button>
 </div>

@@ -20,6 +20,7 @@
  * the designer, and whether that is acceptable is for the caller.
  */
 
+import { t } from './i18n';
 import { fontRefKey, isSystemFamily } from './fonts';
 import { wouldFormat } from './markdown';
 import { normaliseHeaders } from './parse';
@@ -274,8 +275,8 @@ class Swatches {
 		const el = this.byId.get(id);
 		if (!el || depth > 8) return id === 'Color/Black' ? hex(0, 0, 0) : undefined;
 		const thin = (rgb: [number, number, number]) => {
-			const t = Math.max(0, Math.min(100, tint)) / 100;
-			return hex(...(rgb.map((v) => 255 - (255 - v) * t) as [number, number, number]));
+			const amount = Math.max(0, Math.min(100, tint)) / 100;
+			return hex(...(rgb.map((v) => 255 - (255 - v) * amount) as [number, number, number]));
 		};
 		if (el.name === 'Tint') {
 			const own = Number(el.attrs.TintValue);
@@ -567,7 +568,7 @@ function readXml(files: Map<string, Uint8Array>, path: string): XmlElement | nul
 	try {
 		return parseXml(text);
 	} catch (error) {
-		throw new IdmlError(`${path} in this IDML is damaged: ${(error as Error).message}.`);
+		throw new IdmlError(t('indesign.damaged', { path, why: (error as Error).message }));
 	}
 }
 
@@ -626,7 +627,7 @@ function fieldBase(item: XmlElement, kind: 'Text' | 'Picture', n: number): strin
 export function readIdml(files: Map<string, Uint8Array>, name: string): IdmlImport {
 	const designmap = readXml(files, 'designmap.xml');
 	if (!designmap || designmap.name !== 'Document') {
-		throw new IdmlError('This is not an InDesign IDML file — in InDesign, use File › Export… › InDesign Markup (IDML).');
+		throw new IdmlError(t('indesign.notIdml'));
 	}
 	const notes: string[] = [];
 	const sources = (tag: string) => elements(designmap, tag).map((e) => e.attrs.src).filter((s): s is string => !!s);
@@ -645,9 +646,7 @@ export function readIdml(files: Map<string, Uint8Array>, name: string): IdmlImpo
 	// hides it to export the artwork, and may package the file still hidden.
 	const hidden = new Set(layers.filter((l) => l.attrs.Visible === 'false' && !editable.has(l.attrs.Self)).map((l) => l.attrs.Self));
 	if (!editable.size) {
-		notes.push(
-			`There is no layer called “${EDITABLE_LAYER}”, so every text and picture frame on page 1 became a field. Put the frames the writer may change on a layer of that name to keep the rest fixed.`
-		);
+		notes.push(t('indesign.noEditableLayer', { layer: EDITABLE_LAYER }));
 	}
 
 	const stories = new Map<string, XmlElement>();
@@ -672,8 +671,8 @@ export function readIdml(files: Map<string, Uint8Array>, name: string): IdmlImpo
 			spread = s;
 		}
 	}
-	if (!page || !spread) throw new IdmlError('This IDML has no page in it.');
-	if (pageCount > 1) notes.push(`Only page 1 was brought in; the document has ${pageCount}.`);
+	if (!page || !spread) throw new IdmlError(t('indesign.noPage'));
+	if (pageCount > 1) notes.push(t('indesign.onlyPage1', { count: pageCount }));
 
 	const bounds = readBounds(page.attrs.GeometricBounds);
 	const pageW = bounds ? bounds.right - bounds.left : number(documentPrefs?.attrs.PageWidth, 595.276);
@@ -779,11 +778,11 @@ export function readIdml(files: Map<string, Uint8Array>, name: string): IdmlImpo
 				...(columns > 1 ? { columns: { count: columns, gap: round(number(prefProps.TextColumnGutter, 12) * PT, 2) } } : {})
 			});
 			const own: Array<(name: string) => string> = [];
-			if (text.mixed) own.push((n) => `“${n}” sets some words in another face or size; they are in its main style, ${s.family} ${round(s.size, 1)} pt, now.`);
-			if (text.lost) own.push((n) => `“${n}” has words lighter or more upright than the rest; they are set like the rest now.`);
-			if (text.unsafe) own.push((n) => `“${n}” keeps its words plain: they hold characters that would read as formatting, so its bold, italic and line breaks within a paragraph were left out.`);
-			if (text.tables) own.push((n) => `“${n}” holds a table, which was left out.`);
-			if (s.color === undefined) own.push((n) => `“${n}” is coloured with a gradient or a mixed ink, which was left out.`);
+			if (text.mixed) own.push((field) => t('indesign.mixedType', { field, family: s.family, size: round(s.size, 1) }));
+			if (text.lost) own.push((field) => t('indesign.lostWeights', { field }));
+			if (text.unsafe) own.push((field) => t('indesign.plainWords', { field }));
+			if (text.tables) own.push((field) => t('indesign.table', { field }));
+			if (s.color === undefined) own.push((field) => t('indesign.gradient', { field }));
 			wanted.push({ base: fieldBase(item, 'Text', ++texts), box, value: text.value, notes: own });
 			families.set(s.family, (families.get(s.family) ?? 0) + text.value.length + 1);
 			if (s.lang) langs.set(s.lang, (langs.get(s.lang) ?? 0) + text.value.length + 1);
@@ -812,24 +811,13 @@ export function readIdml(files: Map<string, Uint8Array>, name: string): IdmlImpo
 	});
 
 	if (!boxes.length) {
-		notes.push(
-			editable.size
-				? `Nothing on the “${EDITABLE_LAYER}” layer of page 1 is a text or picture frame, so there are no fields.`
-				: 'Page 1 has no text or picture frames, so there are no fields.'
-		);
+		notes.push(editable.size ? t('indesign.noFieldsOnLayer', { layer: EDITABLE_LAYER }) : t('indesign.noFields'));
 	}
-	if (offPage) notes.push(`${offPage} frame${offPage === 1 ? ' is' : 's are'} off page 1 and ${offPage === 1 ? 'was' : 'were'} left out.`);
-	if (threaded) notes.push('Some text runs on from one frame to the next; it is all in the first frame now, and the later frames were left out.');
-	if (skewed) notes.push(`${skewed} frame${skewed === 1 ? ' is' : 's are'} slanted or flipped; placed upright over the same ground.`);
-	if (ignored) {
-		const where = editable.size ? `on the ${EDITABLE_LAYER} layer` : 'on page 1';
-		notes.push(
-			ignored === 1
-				? `1 shape ${where} is neither a text nor a picture frame, and was left out — artwork belongs in the exported background.`
-				: `${ignored} shapes ${where} are neither text nor picture frames, and were left out — artwork belongs in the exported background.`
-		);
-	}
-	if (swatches.usedCmyk) notes.push('CMYK colours are shown as their nearest screen colour; the printed page will be RGB.');
+	if (offPage) notes.push(t('indesign.offPage', { count: offPage }));
+	if (threaded) notes.push(t('indesign.threaded'));
+	if (skewed) notes.push(t('indesign.skewed', { count: skewed }));
+	if (ignored) notes.push(t('indesign.shapes', { count: ignored, where: editable.size ? 'layer' : 'page', layer: EDITABLE_LAYER }));
+	if (swatches.usedCmyk) notes.push(t('indesign.cmyk'));
 
 	const mainFamily = [...families.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
 	const fonts: FontRef[] = [...families.keys()].map((family) =>
@@ -868,9 +856,9 @@ export function readIdml(files: Map<string, Uint8Array>, name: string): IdmlImpo
 		...(lang ? { lang } : {})
 	};
 	if (!(bleedPt > 0)) {
-		notes.push('The document has no bleed, so it prints without one and without crop marks. For print that runs to the edge, add a bleed in InDesign (File › Document Setup) and export the artwork with it.');
+		notes.push(t('indesign.noBleed'));
 	}
-	if (documentPrefs?.attrs.FacingPages === 'true') notes.push('The document has facing pages; page 1 is set up as a single page.');
+	if (documentPrefs?.attrs.FacingPages === 'true') notes.push(t('indesign.facing'));
 
 	const template = normaliseTemplate(toFile(built));
 	return {

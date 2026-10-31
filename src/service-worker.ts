@@ -64,7 +64,7 @@ async function precache(): Promise<void> {
 			// bins the old cache those assets lived in, and the app is a blank page
 			// on every visit until someone clears their storage.
 			const response = await fetch(path, { cache: 'reload' });
-			if (!response.ok) throw new Error(`precache failed: ${path} (${response.status})`);
+			if (!response.ok) throw new Error(`precache failed: ${path} (${response.status})`); // ui-text: allow — the worker's own log, never shown
 			await cache.put(path, await unredirected(response));
 		})
 	);
@@ -137,7 +137,7 @@ async function shellFallback(request: Request): Promise<Response> {
 		const cache = await caches.open(CACHE);
 		const shell = await cache.match(SHELL);
 		if (shell) return shell;
-		throw new Error('offline, and no shell was cached');
+		throw new Error('offline, and no shell was cached'); // ui-text: allow — the worker's own log, never shown
 	}
 }
 

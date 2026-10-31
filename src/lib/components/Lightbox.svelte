@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '$lib/i18n';
 	import Card from './Card.svelte';
 	import Icon from './Icon.svelte';
 	import { swipe } from '$lib/gestures';
@@ -538,7 +539,7 @@
 		if (zoom === 1 && !pinched) step(index + by);
 	}}
 >
-	<button class="plain close" onclick={onclose} title="Close" aria-label="Close">
+	<button class="plain close" onclick={onclose} title={t('common.close')} aria-label={t('common.close')}>
 		<Icon name="close" size={22} />
 	</button>
 	<!-- A stage the size of one card, so the card arriving and the card leaving
@@ -587,7 +588,7 @@
 	     number are one control, and either side of the page they were a
 	     screen-width apart from what they act on. -->
 	<div class="nav-bar" role="presentation" onclick={(e) => e.stopPropagation()}>
-		<button class="plain" disabled={index === 0} onclick={() => step(index - 1)} aria-label="Previous card">
+		<button class="plain" disabled={index === 0} onclick={() => step(index - 1)} aria-label={t('lightbox.previousCard')}>
 			<Icon name="chevron-left" size={26} />
 		</button>
 		<span class="counter">{index + 1} / {dataset.rows.length}</span>
@@ -595,7 +596,7 @@
 			class="plain"
 			disabled={index === dataset.rows.length - 1}
 			onclick={() => step(index + 1)}
-			aria-label="Next card"
+			aria-label={t('lightbox.nextCard')}
 		>
 			<Icon name="chevron-right" size={26} />
 		</button>
