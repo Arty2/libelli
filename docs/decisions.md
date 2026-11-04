@@ -631,6 +631,20 @@ source: a static box with nothing typed into it still draws its fill, its border
 and its size, and `hideWhenEmpty` is what takes it away — two settings that
 already existed, rather than a third state to keep in step.
 
+## `src/lib/svg.ts`
+
+**An allowlist, written back from a parse, not a blacklist run over the text.**
+`static.svg` is markup from a template, and a template is a file someone can
+hand you. The first guard removed `<script>` and ` on…=` with two regexes;
+`<svg/onload=…>` has no space, a `javascript:` link passed whole, and
+`<image href="https://…">` made a request. A blacklist loses to whatever the
+next browser feature is; the XML reader (`xml.ts`) already exists, so the SVG is
+parsed, kept only as elements and attributes on the list, and serialised again
+with everything escaped. References may point inside the picture or carry their
+own pixels; an address is dropped. Not well-formed means nothing is drawn —
+the trade for not guessing the way an HTML parser would. A `<style>` goes through
+`scopeCss`, since inline SVG's stylesheet reaches the whole document.
+
 ## `src/lib/css.ts`
 
 **The guards read what CSS reads, not what was typed.** `\75rl(` is `url(` and

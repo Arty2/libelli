@@ -16,6 +16,7 @@
 	import type { Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
 	import { backgroundStyle, cssUrl, localImageName, safeMediaUrl } from '$lib/assets';
+	import { safeSvg } from '$lib/svg';
 	import { parseColor } from '$lib/color';
 	import { COUNTDOWN_CLOSE, COUNTDOWN_OPEN, UNKNOWN_CLOSE, UNKNOWN_OPEN, applyPlaceholders, countdownMark, type CountdownParts } from '$lib/placeholders';
 	import { cssIdent, isPageId, scopeCss, styleTag } from '$lib/css';
@@ -1198,10 +1199,6 @@
 		else parts.push(`left:${margin}mm`, `right:${margin}mm`, 'text-align:center');
 		return parts.join(';');
 	}
-
-	/** Inline SVG is a template author's own markup, but never let it carry script. */
-	const safeSvg = (svg: string) =>
-		svg.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
 
 	// ---- direct manipulation -------------------------------------------------
 
@@ -2695,7 +2692,7 @@
 						{#if media.svg || (media.src && box.fit !== 'repeat')}
 							<span class="media" style="height:{mediaHeight(box)}">
 								{#if media.svg}
-									<!-- eslint-disable-next-line svelte/no-at-html-tags -- safeSvg is the chokepoint; fitSvg only rewrites its width and height -->
+									<!-- eslint-disable-next-line svelte/no-at-html-tags -- safeSvg (svg.ts) is the chokepoint; fitSvg only rewrites its root's aspect ratio -->
 									{@html fitSvg(safeSvg(media.svg), box.fit)}
 								{:else}
 									<img
