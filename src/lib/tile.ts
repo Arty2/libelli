@@ -14,6 +14,7 @@
  * from a folder therefore repeats exactly as it always did.
  */
 
+import { t } from './i18n';
 import { inkBounds } from './bitmap';
 
 /** src -> what to tile instead. A drawing's own URL when there is nothing to trim. */
@@ -29,7 +30,7 @@ function drawn(src: string): Promise<HTMLImageElement> {
 	return new Promise((resolve, reject) => {
 		const image = new Image();
 		image.onload = () => resolve(image);
-		image.onerror = () => reject(new Error('That image did not load.'));
+		image.onerror = () => reject(new Error(t('tile.notLoaded')));
 		image.src = src;
 	});
 }

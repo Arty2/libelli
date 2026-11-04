@@ -223,7 +223,79 @@ the handler. Measured both ways before the clamp existed — a `-8` bleed drew a
 no card in it and the whole design still inside, unreachable. Neither threw;
 that is what makes it worth writing down.
 
-## `src/lib/package.ts`
+## `src/lib/idml.ts`, `src/lib/xml.ts` and `src/lib/package.ts`
+
+**The Editable layer is the contract.** A designer already sorts a page into
+layers, so a layer called Editable says which frames a writer may change, in
+a place InDesign shows. A Script Label was the alternative: precise, but in a
+panel most designers never open. A frame's name in the Layers panel becomes
+its column, else its Script Label, else `Text 1`, `Picture 1`. A document
+with no such layer still imports, every frame a field, and says so first.
+
+**No bleed is no bleed.** A document without one gets none, and a note: its
+artwork can only be trim-sized, and a bleed made up for it stretched the
+artwork past every field. How a picture sat in its frame by hand is not
+carried, nor noted — nearly every placed picture is scaled, and saying so of
+each said nothing.
+
+**The Editable layer is read even when hidden.** Hiding it is how the
+designer exports the artwork, and a file packaged straight after keeps it
+hidden: skipping hidden layers left that import with no fields at all. Other
+hidden layers are still left out.
+
+**The artwork is a picture the designer exports, never rebuilt.** IDML holds
+no rendering, only paths, swatches and effects. Redrawing a logo from them
+would take a second renderer and still lose gradients, transparency and
+placed vector art. So the page's artwork comes in as a PNG or JPG made with
+the Editable layer hidden, and becomes the background, which covers the
+bleed. `bleedNote` checks the picture's proportions and warns when it looks
+like the trim alone: stretched over the bleed, it sits off every field by
+the bleed's width. A PDF is refused by name, since a browser cannot draw one
+as a background.
+
+**A frame takes one style, its commonest.** An area has one face, size and
+leading, so a frame is set in the style most of its characters use. Its
+paragraph settings come from its commonest paragraph. Bold, italic and a
+colour that differ from that become Markdown (`**`, `*`, `[…]{#hex}`); a frame
+with none of those stays plain, so a writer types no syntax. A run in a
+different face or size is set like the rest, and each frame that has one is
+named in the notes. Markers go on line by line, since markdown.ts
+sets each line of a paragraph on its own and a bold run across a forced line
+break came out as literal asterisks. And Markdown has no escapes here, so a
+frame whose own words would read as formatting stays plain and drops its
+emphasis, with a note: the words are the content. Whether they would is
+markdown.ts's own answer (`wouldFormat`: its blocks and its inline rules),
+asked paragraph by paragraph — a copy of the syntax in idml.ts had already
+missed `__bold__`. A forced line break inside a paragraph makes a frame
+Markdown too when its paragraphs are spaced or indented, since a plain area
+with a paragraph style sets every line as a paragraph. A note names its field by the column it
+became, after duplicates are numbered. Leading becomes a multiple of the size, tracking becomes
+mm, space before and after becomes the paragraph space in lines, and a first
+line indent becomes the indent in em.
+
+**Geometry goes through the matrices.** A frame's outline is its path's
+anchors in its own coordinates; its ItemTransform, through any groups, places
+it in the spread; the page's inverse brings it to the page's top-left. A turn
+is kept as `rotation` about the middle. A slant or a flip has no equivalent,
+so the frame is placed upright over the ground it covers, and noted. Page 1
+only: the first page of the first spread listed.
+
+**Colour is approximate, and says so.** CMYK goes to RGB by the plain formula
+with no profile; Lab through D50. Either way the screen shows a near colour,
+and the PDF the browser prints is RGB. A gradient or a mixed ink is left out
+and named.
+
+**`xml.ts` is a reader, not a DOM.** The tests run without a DOM, and the
+IDML reader walks plain objects. It parses elements, attributes, text and
+CDATA, skips comments, processing instructions (InDesign writes some special
+characters as `<?ACE 7?>`) and a DOCTYPE, and reads only the five named
+entities and numeric ones, which is all IDML uses.
+
+**Checked against real InDesign output.** Besides the hand-written fixture
+(`idml.fixture.ts`), the reader was run over the IDML regression files of an
+open-source IDML library: magazine pages, a four-page document, a rotated
+frame, grouped and threaded frames, linked pictures, and a Package folder
+with its `Document fonts/`. None of those files is in the repository.
 
 **A package carries what a template only names.** A template stays small by
 naming its pictures and fonts (AGENTS.md); a writer who was sent one has
@@ -257,8 +329,8 @@ and when the manifest is one folder down, takes that folder and what is in
 it, so a package unzipped and zipped again still opens. A picture the manifest
 names twice is one picture; one it names but does not hold is said.
 
-**A clash is asked about, each one.** A picture or a font family the package
-brings that this browser already holds, with different bytes, is listed
+**A clash is asked about, each one.** A picture or a font family a package,
+or an InDesign folder, brings that this browser already holds, with different bytes, is listed
 before anything is written, ticked to take the package's (so the design
 prints as it was made) and unticked to keep this browser's. A kept family's
 font is pointed at this browser's file. The same bytes are no clash. Picture
@@ -282,6 +354,37 @@ browser's keys.
 
 **A face's files are loaded before anything is replaced.** A damaged file in
 a package fails before the family this browser had is cleared, and is named.
+
+**The same layout twice opens what is held**, as every other import does,
+after putting back what this browser lost. Comparing it meant reading both
+sides the same way (`sameTemplate` normalises the incoming one too): a
+template built in memory has its keys in another order, and its export
+differed by nothing else. A missing-font note counts only families still
+missing once this browser's own are counted.
+
+**A link the browser cannot draw takes a stand-in.** InDesign links TIFF,
+PSD, PDF and EPS; a browser draws none of them. A PNG or JPG with the same
+name before the ending is shown in its place — one another frame already
+links to first, then one in `Links/`, never by preference the artwork — and
+the cell points at it; the artwork is renamed if a picture has its name; without one the note asks for exactly that name. Which files
+are drawable is the archive reader's call, not the layout reader's, since
+only it sees what else came. A bare IDML gets the same notes about missing
+artwork and pictures as a folder that left them out.
+
+**An InDesign folder is sorted, not trusted.** macOS's `__MACOSX/` and every
+dotfile are dropped. A picture the IDML links to is stored under the link's
+name; any other picture outside `Links/` may be the artwork: the only one,
+else the one named `background` or after the IDML, else the first, noted.
+Font files are matched to the families the layout uses by the family their
+own `name` table gives (typographic family over legacy, so `Minion Pro SmBd`
+is Minion Pro), never by file name. A matched family is installed whole:
+every face the folder has, at its normal width only — a condensed face has the
+same family, weight and slant as the regular, and two faces with one
+description draw whichever the browser found first. A face described twice
+is kept once, and both are listed as left out. The layout passes the
+families its fields are set in, uploaded ones only: a system face needs no
+file and is not missing. Of several IDMLs, the one named after the InDesign
+document in the folder is read.
 
 ## Copy editing — `Template.copy`
 
@@ -3271,8 +3374,8 @@ first, because another template in the library may still be set in it.
 ## `src/lib/assets.ts` and `src/lib/fonts.ts`
 
 **A family can be several files.** An upload was one file for a whole family,
-drawn for every weight. A package brings Regular, Bold, Italic and Bold Italic
-as separate files, and loading each over the last
+drawn for every weight. A package or an InDesign folder brings Regular, Bold,
+Italic and Bold Italic as separate files, and loading each over the last
 would leave only the last. So a face stored with `weight` and `italic` is
 registered with those descriptors. The one nearest Regular is kept under the
 family's own key, which is the key a template's `FontRef.ref` names, so every
@@ -4605,6 +4708,116 @@ hand-formatted and there is no Prettier here. A linter that reflowed it would
 produce a diff nobody reads, and bury every finding above inside it. If a
 formatter is ever wanted, that is a separate decision with its own one-time
 commit.
+
+## `src/lib/i18n.ts`, `src/lib/i18n/en.json` and `Msg.svelte`
+
+**Every word the interface shows is in one file.** A colleague who wants a
+tooltip worded differently, or a translator, opens `src/lib/i18n/en.json`
+and nothing else; the code asks for words by key and never spells them. The
+words on a card are not in it: those are the table's and the template's, in
+the card's language, which `lang.ts` sets and the template's CSS can speak to.
+`docs/translating.md` is the guide for whoever edits the file.
+
+**FormatJS's JSON layout, ICU's message syntax.** `{ key: { defaultMessage,
+description } }` is what FormatJS extracts and what Weblate, Crowdin,
+Lokalise, Phrase and Tolgee import as-is, so the description — where the
+words appear, what a value is — travels with each message into whatever tool
+does the translating. ICU MessageFormat is what those tools check and preview:
+`{count, plural, …}` and `{x, select, …}` keep a sentence whole, where the
+code used to glue an English `s` or a clause on in English order. A sentence
+is one message for the same reason: "Take the {which, select, …} from a
+column" can be reordered by a translator; "Take the " + what + " from a column"
+cannot.
+
+**The formatter is hand-written**, like the CSV parser — no runtime
+dependencies — and reads only as much ICU as the catalogue uses: values,
+`number`, `plural` with `=N` and `#`, `select`, rich-text tags and ICU's
+apostrophe quoting. Plural categories and digits come from `Intl.PluralRules`
+and `Intl.NumberFormat`, a list of names from `Intl.ListFormat`
+(`quotedList`), all Baseline Widely available. Parsed messages are cached by
+key; a message is parsed once per session.
+
+**Rich text without markup.** A message may wrap words in `<strong>`, `<em>`,
+`<kbd>` or `<code>`; `Msg.svelte` draws those four as elements, from a parsed
+tree, and draws any other tag as its words alone. The catalogue's text never
+reaches the page as HTML, so a translation cannot add an attribute, a link or a
+script, and `Msg` needs no `{@html}`. `t()` is the plain-text form, for
+attributes and the status line, and keeps the words of any tag. Where a
+message's words go into markup the app builds as a string — the barcode's and
+the QR code's screen-reader names — they are escaped on the way, for the same
+reason.
+
+**Maps hold keys, and are read at render.** `THEME_NAMES`, `KIND_LABELS`, the
+list-marker and leader labels, the blend modes and the page-number positions
+map a value to a `MessageKey`, and the component calls `t()` where it draws
+the label. A switcher, when there is one, then changes every label without a
+reload. Undo-step names are the exception: they are formatted when the step is
+recorded, in the language of that moment.
+
+**A missing word shows as its key, and the tests make sure it is never
+missing.** `t('table.rowsCopied')` with no such key draws `table.rowsCopied`,
+and a value nobody passed draws `{count}` — wrong, but visibly so. The
+catalogue's tests read every source file and assert that each key asked for
+exists, that each key in the file is asked for somewhere, that each message
+parses and uses only the four tags, and that a call passing its values as an
+object literal passes exactly the names the message reads — whether it names
+one key or chooses between keys with `?:`. A key looked up in a map
+(`t(LEADER_LABELS[x])`) is checked where the map is written, but not for its
+values; those maps hold labels that take none. The key type is
+`keyof typeof catalogue`, so `svelte-check` refuses an unknown key where it is
+written literally.
+
+**Gate 13 keeps it that way.** `scripts/ui-text.mjs` lists markup text outside
+`{…}`; a `title`, `aria-label`, `placeholder`, `alt` or `label` with words
+outside its `{…}`; in a component's script and its `{…}` expressions, any
+string literal that reads as a label — a capital, then letters — or as a
+fragment of three words or more spliced into a sentence (`'it is not valid
+JSON'`), so both branches of `cond ? 'Open' : 'Close'` are seen; and, in any file, a literal
+among the arguments of `notify`, `onnotice`, `describe`, `onaction`,
+`window.prompt`, `notes.push` or a `new …Error`, however the call wraps; and in
+a library module, an object's `label:` or `title:` written as a literal. A
+literal compared with `===`, named in `case`, passed to `includes(` or listed in
+an array that is only asked `.includes(…)` is the keyboard's or the platform's
+(`'Escape'`, `'Files'`) and is let be. Comments are read as comments by walking the
+code, strings included, so neither `accept="image/*"` in markup nor `'/*'` in a
+script opens one. What it still cannot see is a sentence in
+a library module kept in a variable and shown later; review catches those. A
+line that is never shown — the service worker's own log, the message parser's
+error for whoever edits the catalogue — says `ui-text: allow`.
+
+**The browser gets the words, not the notes.** A build-only Vite plugin
+(`vite.config.ts`) strips each `description` as `en.json` is bundled — a third
+of the file, written for translators, which no visitor reads. The tests and the
+dev server read the whole file.
+
+**Numbers read as they were given.** A plain `{n}` or `#` is drawn in the
+locale's digits with no grouping and no rounding, so a 1189mm sheet reads 1189,
+as the field beside it does, and a 0.0125mm tracking is not cut to 0.013.
+`{n, number}` is there for the full style when a message wants it.
+
+**A malformed message shows as its key.** A translator's typo, or ICU this
+reader does not know (`selectordinal`, `{n, number, percent}`), is logged and
+drawn as the key, as a missing one is, rather than throwing inside a
+component's render.
+
+**A name the app gives is the user's from then on.** "Untitled card", "New
+table" and "Getting Started" are written into the design or table in the
+interface's language when it is made, and stay so: a name is data a person
+renames, exports and sends, and a file that changed its own name when opened
+under another language would be stranger than one that keeps the name it was
+given. Names that are only shown — the starters in the Reset menus, a fallback
+for a nameless entry in a list — are read when shown, never cached at load.
+
+**One key per meaning, not per spelling.** Two places that say the same thing
+about the same thing share a key (the page's and the sheet's background buttons,
+Next card on the stage and in the lightbox). The same English for different
+things keeps two: "Color" as a blend mode and as a field label, "Solid" as a
+border and as a leader, Align Left for text and for areas — another language
+may need two words where English has one.
+
+**One language, and no switcher yet.** `LOCALE` is `'en'`. When a second
+language arrives, its file sits beside `en.json` with the same keys, and
+`LOCALE` comes from a setting; `t()`'s callers do not change.
 
 ## `scripts/gates.sh`
 

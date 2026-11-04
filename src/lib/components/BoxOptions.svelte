@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t, type MessageKey } from '$lib/i18n';
 	import Icon from './Icon.svelte';
 	import ColorField from './ColorField.svelte';
 	import { withKey } from '$lib/keys';
@@ -138,11 +139,11 @@
 	 * list. Each name in its own face.
 	 */
 	const fontItems = $derived.by((): MenuItem[] => [
-		{ value: '', label: `Default: ${template.defaults.font}` },
+		{ value: '', label: t('common.defaultValue', { value: template.defaults.font }) },
 		...familyItems(families),
 		{ rule: true },
-		{ value: '__custom', label: 'Other Family…' },
-		{ value: '__upload', label: 'Upload a Font File…' }
+		{ value: '__custom', label: t('area.font.other') },
+		{ value: '__upload', label: t('area.font.upload') }
 	]);
 
 	const anchorOptions = $derived(template.boxes.filter((b) => b.id !== selected?.id));
@@ -158,36 +159,36 @@
 	const padSides = $derived(sidesOf(selected?.padding));
 	const showPadSides = $derived(perSidePadding || typeof selected?.padding === 'object');
 
-	/** Title case, and Carbon's own words where CSS's are hyphenated. */
-	const BLEND_LABELS: Record<BlendMode, string> = {
-		multiply: 'Multiply',
-		screen: 'Screen',
-		overlay: 'Overlay',
-		darken: 'Darken',
-		lighten: 'Lighten',
-		difference: 'Difference',
-		exclusion: 'Exclusion',
-		'hard-light': 'Hard Light',
-		'soft-light': 'Soft Light',
-		hue: 'Hue',
-		saturation: 'Saturation',
-		color: 'Color',
-		luminosity: 'Luminosity'
+	/** The design tools' own words, where CSS's are hyphenated. */
+	const BLEND_LABELS: Record<BlendMode, MessageKey> = {
+		multiply: 'blend.multiply',
+		screen: 'blend.screen',
+		overlay: 'blend.overlay',
+		darken: 'blend.darken',
+		lighten: 'blend.lighten',
+		difference: 'blend.difference',
+		exclusion: 'blend.exclusion',
+		'hard-light': 'blend.hardLight',
+		'soft-light': 'blend.softLight',
+		hue: 'blend.hue',
+		saturation: 'blend.saturation',
+		color: 'blend.color',
+		luminosity: 'blend.luminosity'
 	};
 
-	const STYLE_LABELS: Record<BorderStyle, string> = {
-		solid: 'Solid',
-		dashed: 'Dashed',
-		dotted: 'Dotted',
-		double: 'Double',
-		stamp: 'Stamp'
+	const STYLE_LABELS: Record<BorderStyle, MessageKey> = {
+		solid: 'border.style.solid',
+		dashed: 'border.style.dashed',
+		dotted: 'border.style.dotted',
+		double: 'border.style.double',
+		stamp: 'border.style.stamp'
 	};
 
-	const ALIGNMENTS: Array<{ value: Align; icon: string; label: string }> = [
-		{ value: 'left', icon: 'align-left', label: 'Left' },
-		{ value: 'center', icon: 'align-center', label: 'Centre' },
-		{ value: 'right', icon: 'align-right', label: 'Right' },
-		{ value: 'justify', icon: 'align-justify', label: 'Justified' }
+	const ALIGNMENTS: Array<{ value: Align; icon: string; label: MessageKey }> = [
+		{ value: 'left', icon: 'align-left', label: 'textAlign.left' },
+		{ value: 'center', icon: 'align-center', label: 'textAlign.centre' },
+		{ value: 'right', icon: 'align-right', label: 'textAlign.right' },
+		{ value: 'justify', icon: 'align-justify', label: 'textAlign.justify' }
 	];
 
 	const setStatic = (change: Partial<NonNullable<Box['static']>>) =>
@@ -267,11 +268,11 @@
 	/** An address, asked for the way the page's background asks for one. */
 	function linkPicture() {
 		const was = selected?.static?.url && !pictureColor ? selected.static.url : 'https://';
-		const url = window.prompt('Address of the image', was);
+		const url = window.prompt(t('area.picture.prompt'), was);
 		if (url === null) return;
 		const safe = safeImageUrl(url);
 		if (!safe) {
-			onnotice('An image address has to be an http or https address.', 'warning');
+			onnotice(t('area.picture.wrong'), 'warning');
 			return;
 		}
 		setPictureAddress(safe);
@@ -283,18 +284,13 @@
 	/** Whether this area is one a drawing can be made in — see the pen, below. */
 	const drawable = $derived(!!selected && takesADrawing(selected.mode));
 
-	const VERTICALS: Array<{ value: VAlign; icon: string; label: string }> = [
-		{ value: 'top', icon: 'valign-top', label: 'Top' },
-		{ value: 'middle', icon: 'valign-middle', label: 'Middle' },
-		{ value: 'bottom', icon: 'valign-bottom', label: 'Bottom' }
+	const VERTICALS: Array<{ value: VAlign; icon: string; label: MessageKey }> = [
+		{ value: 'top', icon: 'valign-top', label: 'textAlign.top' },
+		{ value: 'middle', icon: 'valign-middle', label: 'textAlign.middle' },
+		{ value: 'bottom', icon: 'valign-bottom', label: 'textAlign.bottom' }
 	];
 
-	const EDGES: Array<{ key: keyof Sides; label: string }> = [
-		{ key: 'top', label: 'T' },
-		{ key: 'right', label: 'R' },
-		{ key: 'bottom', label: 'B' },
-		{ key: 'left', label: 'L' }
-	];
+	const EDGES: Array<keyof Sides> = ['top', 'right', 'bottom', 'left'];
 
 	const patch = (change: Partial<Box>) => {
 		if (selected) onboxchange({ ...selected, ...change });
@@ -354,7 +350,7 @@
 	}
 
 	/** The page's paragraph style, said in the words the select uses. */
-	const PARAGRAPH_LABELS = { space: 'Space After', indent: 'Indent' } as const;
+	const PARAGRAPH_LABELS = { space: 'area.spaceAfter', indent: 'area.indent' } as const;
 
 	function setParagraph(mode: string, amount?: number) {
 		if (mode !== 'space' && mode !== 'indent') {
@@ -378,11 +374,11 @@
 	const round2 = (n: number) => Math.round(n * 100) / 100;
 	const refX = $derived(selected ? round2(selected.x + selected.w * reference.fx) : 0);
 	const refY = $derived(selected ? round2(selected.y + selected.h * reference.fy) : 0);
-	const REF_X = { 0: 'left edge', 0.5: 'middle, across', 1: 'right edge' } as const;
-	const REF_Y = { 0: 'top edge', 0.5: 'middle, down', 1: 'bottom edge' } as const;
+	const REF_X = { 0: 'left', 0.5: 'centre', 1: 'right' } as const;
+	const REF_Y = { 0: 'top', 0.5: 'middle', 1: 'bottom' } as const;
 	// Centred both ways the reference point is the area's middle, which has no
 	// handle to ring.
-	const ringNote = $derived(reference.fx === 0.5 && reference.fy === 0.5 ? '' : ', and the handle with the ring');
+	const ring = $derived(reference.fx === 0.5 && reference.fy === 0.5 ? 'no' : 'yes');
 
 	/** The area's own list style, field by field; a blank field takes the page's. */
 	function setList(change: Record<string, unknown>) {
@@ -436,7 +432,7 @@
 			return;
 		}
 		if (value === '__custom') {
-			const family = window.prompt('Font family name (as Google Fonts spells it)');
+			const family = window.prompt(t('area.font.prompt'));
 			if (!family) return;
 			registerFamily(family);
 			patch({ font: family });
@@ -527,14 +523,14 @@
 		if (clash) {
 			putBack();
 			onnotice(
-				`Another area is already called “${clash.slot}”. A name is that area's CSS id, so no two can share one.`,
+				t('area.nameTaken', { name: clash.slot! }),
 				'warning'
 			);
 			return;
 		}
 		if (ident && isPageId(ident)) {
 			putBack();
-			onnotice(`“${value}” would be #${ident}, which is a page's CSS id — choose another name for the area.`, 'warning');
+			onnotice(t('area.nameIsPageId', { value, ident }), 'warning');
 			return;
 		}
 
@@ -602,15 +598,13 @@
 	still what an area shows on a row whose cell is not a color. One pattern for
 	all three colors, so it is learnt once.
 -->
-{#snippet fromColumn(key: ColorKey, what: string)}
+{#snippet fromColumn(key: ColorKey)}
 	{@const column = selected.colorFrom?.[key]}
 	<button
 		class="square"
 		aria-pressed={linkShown(key)}
-		title={linkShown(key)
-			? `Stop taking the ${what} from a column`
-			: `Take the ${what} from a column of the row, where its cell is a color — #c0392b, teal, rgb(…)`}
-		aria-label="{what} from a column"
+		title={t(linkShown(key) ? 'area.colorFrom.stop' : 'area.colorFrom.start', { which: key })}
+		aria-label={t('area.colorFrom.label', { which: key })}
 		disabled={boxFrozen}
 		onclick={() => toggleLink(key)}
 	><Icon name="link" size={14} /></button>
@@ -618,12 +612,12 @@
 		<select
 			class:inherits={!column}
 			value={column ?? ''}
-			title="The column whose cell is this area's {what}; a cell that is not a color leaves the swatch's"
-			aria-label="Column for the {what}"
+			title={t('area.colorFrom.columnTitle', { which: key })}
+			aria-label={t('area.colorFrom.columnLabel', { which: key })}
 			disabled={boxFrozen}
 			onchange={(e) => setColorFrom(key, e.currentTarget.value || undefined)}
 		>
-			<option value="">— Column —</option>
+			<option value="">{t('area.columnPrompt')}</option>
 			{#each dataset.columns as name (name)}
 				<option value={name}>{name}</option>
 			{/each}
@@ -631,7 +625,7 @@
 			     than showing the menu blank: the template still names it, and
 			     another table may have it. -->
 			{#if column && !dataset.columns.includes(column)}
-				<option value={column}>{column} (not in this table)</option>
+				<option value={column}>{t('area.colorFrom.missing', { column })}</option>
 			{/if}
 		</select>
 	{/if}
@@ -643,7 +637,7 @@
 	tab, each subject is a fieldset with its name on it. Same shape as the page
 	bar; see docs/decisions.md.
 -->
-	<div class="options box-options" aria-label="Area settings">
+	<div class="options box-options" aria-label={t('area.areaSettingsLabel')}>
 		<!-- The lock, what this is and what it is called, and the two things you
 		     do to it, on one line. Lock first, as in the page bar and under the
 		     table: it is the state of the thing named beside it, not an errand,
@@ -653,21 +647,21 @@
 				<button
 					class="lock-toggle"
 					aria-pressed={!!selected.locked}
-					title={withKey(selected.locked ? 'Unlock this area' : 'Lock this area — no dragging, no resizing, no option changes', 'lockArea')}
+					title={withKey(t(selected.locked ? 'area.unlockTitle' : 'area.lockTitle'), 'lockArea')}
 					disabled={pageFrozen}
 					onclick={() => patch({ locked: selected.locked ? undefined : true })}
 				>
 					<Icon name={selected.locked ? 'unlocked' : 'locked'} size={14} />
-					{selected.locked ? 'Unlock' : 'Lock'}
+					{t(selected.locked ? 'design.unlock' : 'design.lock')}
 				</button>
-				<span class="context">Name</span>
+				<span class="context">{t('area.name')}</span>
 				{#if source === 'field'}
 					<label class="field area-name">
-						<span class="sr-only">Name</span>
+						<span class="sr-only">{t('area.name')}</span>
 						<input
 							class="w-5"
 							value={selected.slot ?? ''}
-							title={`The template's own name for what this area holds; the column beside it says which spreadsheet column fills it. It is also this area's CSS id${cssIdent(selected.slot ?? '') ? ` — #${cssIdent(selected.slot ?? '')}` : ''}, so no two areas may share a name.`}
+							title={t('area.nameTitle', { ident: cssIdent(selected.slot ?? ''), hasIdent: cssIdent(selected.slot ?? '') ? 'yes' : 'no' })}
 							disabled={boxFrozen}
 							onchange={(e) => setSlot(e.currentTarget.value, e.currentTarget)}
 						/>
@@ -677,16 +671,16 @@
 					class="danger-outline delete"
 					onclick={ondelete}
 					disabled={boxFrozen}
-					title={withKey('Delete this area', 'delete')}
-					aria-label="Delete this area"
+					title={withKey(t('area.deleteTitle'), 'delete')}
+					aria-label={t('area.deleteTitle')}
 				>
-					<Icon name="trash" size={14} /> <span class="label">Delete</span>
+					<Icon name="trash" size={14} /> <span class="label">{t('common.delete')}</span>
 				</button>
 				<!-- The bar away, for the room under it; it comes back with the next
 				     area chosen. A bare glyph, as the CSS dialog's window controls
 				     are: it is about the bar, not an act on the area. -->
 				{#if onhide}
-					<button class="bar-hide" onclick={onhide} title="Hide these settings until the next area is chosen" aria-label="Hide the area settings">
+					<button class="bar-hide" onclick={onhide} title={t('area.hideTheseSettingsUntilTitle')} aria-label={t('area.hideAreaSettingsLabel')}>
 						<Icon name="row-collapse" size={16} />
 					</button>
 				{/if}
@@ -697,34 +691,34 @@
 		     then the box around it. A value the area takes from the page shows in
 		     italics; one it sets for itself has an × that takes it back. -->
 		<fieldset class="group">
-			<legend>Content</legend>
+			<legend>{t('area.content')}</legend>
 			<label class="field">
-				<span class="sr-only">Content</span>
+				<span class="sr-only">{t('area.content')}</span>
 				<select
 					value={source}
-					title="Where this area gets what it shows"
+					title={t('area.whereAreaGetsWhatTitle')}
 					disabled={boxFrozen}
 					onchange={(e) => setSource(e.currentTarget.value as Source)}
 				>
-					<option value="field">Data Field</option>
-					<option value="static">Static Text</option>
-					<option value="image">Image</option>
+					<option value="field">{t('area.dataField')}</option>
+					<option value="static">{t('area.staticText')}</option>
+					<option value="image">{t('area.image')}</option>
 				</select>
 			</label>
 			{#if selected.slot}
 				<label class="field">
-					<span>Column</span>
+					<span>{t('area.column')}</span>
 					<!-- Frozen with the rest of them. Which column an area draws from is an
 					     option like any other — it changes what the area shows — and this
 					     was the one control in the bar a lock did not reach, so a locked
 					     area sat there with eight fields gone quiet and one still lit. -->
 					<select
 						value={mapping[selected.slot] ?? ''}
-						title="Which spreadsheet column fills this field"
+						title={t('area.whichSpreadsheetColumnFillsTitle')}
 						disabled={boxFrozen}
 						onchange={(e) => onmappingchange({ ...mapping, [selected.slot as string]: e.currentTarget.value })}
 					>
-						<option value="">— None —</option>
+						<option value="">{t('area.noColumn')}</option>
 						{#each dataset.columns as column (column)}
 							<option value={column}>{column}</option>
 						{/each}
@@ -737,32 +731,32 @@
 				     the address and the color both, which nobody guessed took a color. -->
 				<button
 					disabled={boxFrozen}
-					title="An image from this device — kept in this browser (or your images folder), the template only names it"
+					title={t('area.imageDeviceKeptBrowserTitle')}
 					onclick={() => pictureInput?.click()}
 				>
-					<Icon name="image-reference" size={14} /> Upload…
+					<Icon name="image-reference" size={14} /> {t('area.upload')}
 				</button>
 				<button
 					disabled={boxFrozen}
-					title={selected.static?.url && !pictureColor ? `Now: ${selected.static.url}` : 'An http(s) address the template will carry as written'}
+					title={selected.static?.url && !pictureColor ? t('area.picture.now', { url: selected.static.url }) : t('background.urlTitle')}
 					onclick={linkPicture}
 				>
-					<Icon name="copy-link" size={14} /> URL…
+					<Icon name="copy-link" size={14} /> {t('area.url')}
 				</button>
 				<button
 					disabled={boxFrozen}
-					title="Draw a small image for this area, saved in the template — over the one it shows, where the browser allows"
+					title={t('area.drawStaticTitle')}
 					onclick={() => ondraw?.(selected.id)}
 				>
-					<Icon name="edit" size={14} /> {selected.static?.dataUrl ? 'Edit…' : 'Draw…'}
+					<Icon name="edit" size={14} /> {t(selected.static?.dataUrl ? 'area.edit' : 'area.draw')}
 				</button>
 				<span class="field">
-					<span class="sr-only">Color</span>
+					<span class="sr-only">{t('area.color')}</span>
 					<ColorField
 						value={pictureColor ?? undefined}
 						fallback="#ffffff"
-						label="Area color"
-						title="Fill the area with a color instead of an image"
+						label={t('area.colorLabel')}
+						title={t('area.fillAreaColorInsteadTitle')}
 						disabled={boxFrozen}
 						onchange={(v) => setPictureAddress(v)}
 					/>
@@ -780,14 +774,14 @@
 				/>
 			{:else}
 				<label class="field">
-					<span>Text</span>
+					<span>{t('area.text')}</span>
 					<input
 						bind:this={textInput}
 						use:completePlaceholders={dataset.columns}
 						class="w-8"
 						value={selected.static?.text ?? ''}
-						placeholder="Text — the same on every card"
-						title="Text saved in the template, not in the data — the same on every card"
+						placeholder={t('area.textSameEveryCardPlaceholder')}
+						title={t('area.textSavedTemplateNotTitle')}
 						disabled={boxFrozen}
 						onchange={(e) => setStatic({ text: e.currentTarget.value })}
 						onkeydown={(e) => {
@@ -806,10 +800,10 @@
 			     "Content: Bitmap" is the same fact twice. -->
 			{#if source === 'field' || source === 'static'}
 				<label class="field">
-					<span>Mode</span>
+					<span>{t('area.mode')}</span>
 					<select value={selected.mode} disabled={boxFrozen} onchange={(e) => setMode(e.currentTarget.value as Box['mode'])}>
-						<option value="plain">Plain Text</option>
-						<option value="markdown">Markdown</option>
+						<option value="plain">{t('area.plainText')}</option>
+						<option value="markdown">{t('area.markdown')}</option>
 						<!-- A column can hold a picture — a drawing, an address, a
 						     stored name — so a field offers it. Words typed into the
 						     template cannot be one: that is what the Image content
@@ -818,14 +812,14 @@
 						     area a template made with it, so the menu shows what
 						     the area is. -->
 						{#if source === 'field'}
-							<option value="image">Image</option>
+							<option value="image">{t('area.image')}</option>
 							{#if selected.mode === 'color'}
-								<option value="color">Color</option>
+								<option value="color">{t('area.color')}</option>
 							{/if}
 						{/if}
 						<!-- Every code the area can draw, QR and the barcodes; the type
 						     is chosen in its own group. Still `qr` in the file. -->
-						<option value="qr">Barcode</option>
+						<option value="qr">{t('area.barcode')}</option>
 					</select>
 				</label>
 			{/if}
@@ -833,14 +827,14 @@
 			     nothing to choose for it. -->
 			{#if takesADrawing(selected.mode) || (selected.mode === 'qr' && !selected.qr?.kind)}
 				<label class="field">
-					<span>Fit</span>
+					<span>{t('area.fit')}</span>
 					<select value={selected.fit ?? 'contain'} disabled={boxFrozen} onchange={(e) => patch({ fit: e.currentTarget.value as Box['fit'] })}>
-						<option value="contain">Fit</option>
-						<option value="cover">Cover</option>
-						<option value="fill">Stretch</option>
+						<option value="contain">{t('area.fit')}</option>
+						<option value="cover">{t('area.cover')}</option>
+						<option value="fill">{t('area.stretch')}</option>
 						<!-- Pictures only. A tiled QR code is not a QR code. -->
 						{#if takesADrawing(selected.mode)}
-							<option value="repeat">Tile</option>
+							<option value="repeat">{t('area.tile')}</option>
 						{/if}
 					</select>
 				</label>
@@ -852,10 +846,10 @@
 				     page. -->
 				<button
 					disabled={boxFrozen}
-					title="Draw a small image for this area. It is written into this row's cell, so every row can have its own"
+					title={t('area.drawCellTitle')}
 					onclick={() => ondraw?.(selected.id)}
 				>
-					<Icon name="edit" size={14} /> Draw…
+					<Icon name="edit" size={14} /> {t('area.draw')}
 				</button>
 			{/if}
 
@@ -869,27 +863,27 @@
 					checked={!!selected.hideWhenEmpty}
 					disabled={boxFrozen || emptyStatic}
 					title={emptyStatic
-						? 'Does not apply to an area holding its own words and none of them — it stays in view so it can be selected'
+						? t('area.hideEmptyNotApplicable')
 						: undefined}
 					onchange={(e) => patch({ hideWhenEmpty: e.currentTarget.checked })}
 				/>
-				Hide When Empty
+				{t('area.hideWhenEmpty')}
 			</label>
 		</fieldset>
 		{#if selected.mode === 'qr'}
 			<fieldset class="group">
-				<legend>Barcode</legend>
+				<legend>{t('area.barcode')}</legend>
 				<label class="field">
-					<span>Type</span>
+					<span>{t('area.type')}</span>
 					<select
 						value={selected.qr?.kind ?? 'qr'}
-						title="QR holds anything and reads from any angle; Code 128 is a line of bars for any plain text; EAN-13 is a 13-digit retail number or ISBN"
+						title={t('area.qrHoldsAnythingReadsTitle')}
 						disabled={boxFrozen}
 						onchange={(e) => setQrKind(e.currentTarget.value)}
 					>
-						<option value="qr">QR Code</option>
-						<option value="code128">Code 128</option>
-						<option value="ean13">EAN-13</option>
+						<option value="qr">{t('area.qrCode')}</option>
+						<option value="code128">{t('area.code128')}</option>
+						<option value="ean13">{t('area.ean13')}</option>
 					</select>
 				</label>
 				{#if selected.qr?.kind}
@@ -899,22 +893,22 @@
 						<input
 							type="checkbox"
 							checked={!selected.qr.hideDigits}
-							title="The digits under the bars, in this area's type — EAN-13 in its three groups, Code 128 centred"
+							title={t('area.digitsUnderBarsAreasTitle')}
 							disabled={boxFrozen}
 							onchange={(e) => {
 								const { hideDigits: _was, ...rest } = { ...DEFAULT_QR, ...selected.qr };
 								patch({ qr: e.currentTarget.checked ? rest : { ...rest, hideDigits: true } });
 							}}
 						/>
-						Show Digits
+						{t('area.showDigits')}
 					</label>
 				{/if}
 				{#if !selected.qr?.kind}
 					<label class="field">
-						<span>Correction</span>
+						<span>{t('area.correction')}</span>
 						<select
 							value={selected.qr?.level ?? DEFAULT_QR.level}
-							title="How much of the code can be damaged and still scan"
+							title={t('area.howMuchCodeCanTitle')}
 							disabled={boxFrozen}
 							onchange={(e) => setQr({ level: e.currentTarget.value as QrSettings['level'] })}
 						>
@@ -926,24 +920,24 @@
 					</label>
 				{/if}
 				<label class="field">
-					<span>Background</span>
+					<span>{t('area.background')}</span>
 					<select
 						value={selected.qr?.background ? 'opaque' : 'transparent'}
-						title="Transparent lets the paper show through; a scanner needs contrast either way"
+						title={t('area.transparentLetsPaperShowTitle')}
 						disabled={boxFrozen}
 						onchange={(e) => setQrBackground(e.currentTarget.value === 'opaque')}
 					>
-						<option value="transparent">Transparent</option>
-						<option value="opaque">Solid</option>
+						<option value="transparent">{t('area.transparent')}</option>
+						<option value="opaque">{t('area.solid')}</option>
 					</select>
 				</label>
 				{#if selected.qr?.background}
 					<span class="field">
-						<span class="sr-only">Barcode Background Color</span>
+						<span class="sr-only">{t('area.barcodeBackgroundColor')}</span>
 						<ColorField
 							value={selected.qr.background}
 							fallback="#ffffff"
-							label="Barcode background color"
+							label={t('area.barcodeBackgroundLabel')}
 							disabled={boxFrozen}
 							onchange={(v) => setQr({ background: v })}
 						/>
@@ -952,13 +946,13 @@
 			</fieldset>
 		{/if}
 		<fieldset class="group">
-			<legend>Align</legend>
-			<span class="segmented" role="group" aria-label="Horizontal alignment">
+			<legend>{t('area.align')}</legend>
+			<span class="segmented" role="group" aria-label={t('area.horizontalAlignmentLabel')}>
 				{#each ALIGNMENTS as option (option.value)}
 					<button
 						aria-pressed={(selected.align ?? template.defaults.align) === option.value}
-						title="Align {option.label}"
-						aria-label="Align {option.label}"
+						title={t(option.label)}
+						aria-label={t(option.label)}
 						disabled={boxFrozen}
 						onclick={() => patch({ align: option.value })}
 					>
@@ -967,14 +961,14 @@
 				{/each}
 			</span>
 			{#if selected.align}
-				<ResetButton to="the page's alignment" disabled={boxFrozen} onclick={() => patch({ align: undefined })} />
+				<ResetButton to={t('reset.pageAlignment')} disabled={boxFrozen} onclick={() => patch({ align: undefined })} />
 			{/if}
-			<span class="segmented" role="group" aria-label="Vertical alignment">
+			<span class="segmented" role="group" aria-label={t('area.verticalAlignmentLabel')}>
 				{#each VERTICALS as option (option.value)}
 					<button
 						aria-pressed={(selected.valign ?? 'top') === option.value}
-						title="Align {option.label}"
-						aria-label="Align {option.label}"
+						title={t(option.label)}
+						aria-label={t(option.label)}
 						disabled={boxFrozen}
 						onclick={() => patch({ valign: option.value })}
 					>
@@ -984,14 +978,14 @@
 			</span>
 		</fieldset>
 		<fieldset class="group">
-			<legend>Text</legend>
+			<legend>{t('area.text')}</legend>
 			<!-- A QR code is drawn, not set: of the type it keeps only its color —
 			     but a barcode's digits are set, in this face, size and weight. -->
 			{#if selected.mode !== 'qr' || (selected.qr?.kind && !selected.qr.hideDigits)}
 			<span class="field" class:inherits={!selected.font}>
-				<span>Font</span>
+				<span>{t('area.font')}</span>
 				<MenuSelect
-					label="Font"
+					label={t('area.font')}
 					value={selected.font ?? ''}
 					items={fontItems}
 					disabled={boxFrozen}
@@ -1000,18 +994,18 @@
 					onselect={setFont}
 				/>
 				{#if selected.font}
-					<ResetButton to="the page's {template.defaults.font}" disabled={boxFrozen} onclick={() => patch({ font: undefined })} />
+					<ResetButton to={t('reset.pageValue', { value: template.defaults.font })} disabled={boxFrozen} onclick={() => patch({ font: undefined })} />
 				{/if}
 			</span>
 			<label class="field">
-				<span>Size</span>
+				<span>{t('area.size')}</span>
 				<input
 					class="n-3"
 					type="number"
 					step="0.5"
 					min="1"
 					placeholder={String(template.defaults.size)}
-					title="Blank inherits the page's {template.defaults.size}pt"
+					title={t('area.sizeTitle', { size: template.defaults.size })}
 					value={selected.size ?? ''}
 					disabled={boxFrozen}
 					onchange={(e) => {
@@ -1021,9 +1015,9 @@
 						patch(size === undefined ? { size } : { size, xHeight: undefined });
 					}}
 				/>
-				<span class="unit">pt</span>
+				<span class="unit">{t('area.pt')}</span>
 				{#if selected.size !== undefined}
-					<ResetButton to="the page's {template.defaults.size}pt" disabled={boxFrozen} onclick={() => patch({ size: undefined })} />
+					<ResetButton to={t('reset.pageSize', { size: template.defaults.size })} disabled={boxFrozen} onclick={() => patch({ size: undefined })} />
 				{/if}
 			</label>
 			<!-- The face's lowercase as a percentage of the size, to make one
@@ -1031,7 +1025,7 @@
 			     takes that size, since a size of its own already says how big
 			     its words are. Blank is the face's own, shown greyed. -->
 			<label class="field" class:inherits={selected.xHeight === undefined}>
-				<span>X-Height</span>
+				<span>{t('area.xHeight')}</span>
 				<input
 					class="n-3"
 					type="number"
@@ -1040,8 +1034,8 @@
 					max="100"
 					placeholder={ownXHeight === undefined ? '' : String(Math.round(ownXHeight * 100))}
 					title={selected.size === undefined
-						? "The lowercase's height as a percentage of the size; blank is the face's own"
-						: 'Only with the page\'s size — clear Size to set it'}
+						? t('area.xHeightTitle')
+						: t('area.xHeightOff')}
 					value={selected.xHeight === undefined ? '' : Math.round(selected.xHeight * 100)}
 					disabled={boxFrozen || selected.size !== undefined}
 					onchange={(e) => {
@@ -1051,93 +1045,93 @@
 				/>
 				<span class="unit">%</span>
 				{#if selected.xHeight !== undefined}
-					<ResetButton to="the face's own" disabled={boxFrozen} onclick={() => patch({ xHeight: undefined })} />
+					<ResetButton to={t('reset.faceOwn')} disabled={boxFrozen} onclick={() => patch({ xHeight: undefined })} />
 				{/if}
 			</label>
 			<label class="field">
-				<span>Weight</span>
+				<span>{t('area.weight')}</span>
 				<select
 					class:inherits={selected.weight === undefined}
 					value={selected.weight === undefined ? '' : String(selected.weight)}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ weight: e.currentTarget.value ? Number(e.currentTarget.value) : undefined })}
 				>
-					<option value="">Default: {template.defaults.weight}</option>
+					<option value="">{t('common.defaultValue', { value: template.defaults.weight })}</option>
 					{#each weights as weight (weight)}
 						<option value={String(weight)}>{weight}</option>
 					{/each}
 				</select>
 				{#if selected.weight !== undefined}
-					<ResetButton to="the page's {template.defaults.weight}" disabled={boxFrozen} onclick={() => patch({ weight: undefined })} />
+					<ResetButton to={t('reset.pageValue', { value: template.defaults.weight })} disabled={boxFrozen} onclick={() => patch({ weight: undefined })} />
 				{/if}
 			</label>
 			{/if}
 			<span class="field" class:inherits={!selected.color}>
-				<span>Color</span>
+				<span>{t('area.color')}</span>
 				<ColorField
 					value={selected.color}
 					fallback={template.defaults.color}
-					label="Text color"
+					label={t('area.textColorLabel')}
 					hueFrom={selected.colorFrom?.text}
 					preview={previewOf('text')}
-					title={selected.color ? undefined : "The page's text color"}
+					title={selected.color ? undefined : t('area.textColorTitle')}
 					disabled={boxFrozen}
 					onchange={(v) => patch({ color: v })}
 				/>
 				{#if selected.color}
-					<ResetButton to="the page's text color" disabled={boxFrozen} onclick={() => patch({ color: undefined })} />
+					<ResetButton to={t('reset.pageTextColor')} disabled={boxFrozen} onclick={() => patch({ color: undefined })} />
 				{/if}
-				{@render fromColumn('text', 'text color')}
+				{@render fromColumn('text')}
 			</span>
 			{#if selected.mode !== 'qr'}
 			<label class="field">
-				<span>Tracking</span>
+				<span>{t('area.tracking')}</span>
 				<input
 					class="n-3"
 					type="number"
 					step="0.05"
 					placeholder={String(template.defaults.letterSpacing)}
-					title="Tracking: space added between letters, in mm; blank inherits the page's"
+					title={t('area.trackingSpaceAddedBetweenTitle')}
 					value={selected.letterSpacing ?? ''}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ letterSpacing: inherited(e) })}
 				/>
-				<span class="unit">mm</span>
+				<span class="unit">{t('common.mm')}</span>
 				{#if selected.letterSpacing !== undefined}
-					<ResetButton to="the page's {template.defaults.letterSpacing}mm" disabled={boxFrozen} onclick={() => patch({ letterSpacing: undefined })} />
+					<ResetButton to={t('reset.pageTracking', { tracking: template.defaults.letterSpacing })} disabled={boxFrozen} onclick={() => patch({ letterSpacing: undefined })} />
 				{/if}
 			</label>
 			<label class="field">
-				<span>Case</span>
+				<span>{t('area.case')}</span>
 				<select value={selected.textCase ?? 'none'} disabled={boxFrozen} onchange={(e) => patch({ textCase: e.currentTarget.value as Box['textCase'] })}>
-					<option value="none">As Typed</option>
-					<option value="smallcaps">Small Caps</option>
-					<option value="uppercase">Uppercase</option>
+					<option value="none">{t('area.asTyped')}</option>
+					<option value="smallcaps">{t('area.smallCaps')}</option>
+					<option value="uppercase">{t('area.uppercase')}</option>
 				</select>
 			</label>
 			{/if}
 		</fieldset>
 		<fieldset class="group">
-			<legend>Position</legend>
+			<legend>{t('area.position')}</legend>
 			<!-- X and Y name the reference point, the one the ring is on: the
 			     corner the words are set from, or the middle of an edge where
 			     they are centred. Shown and typed there, kept in memory as the
 			     top-left corner as ever; frame.ts turns it into the reference
 			     point the file stores. Measured against the declared height, which is the one
 			     the field beside it says. -->
-			<label class="field"><span>X</span>
+			<label class="field"><span>{t('area.x')}</span>
 				<input
 					class="n-4"
 					type="number"
 					step="0.5"
 					value={refX}
-					title="The {REF_X[reference.fx]} — where the words are set from{ringNote}"
+					title={t('area.refXTitle', { edge: REF_X[reference.fx], ring })}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ x: round2(numeric(e, refX) - selected.w * reference.fx) })}
 				/>
-				<span class="unit">mm</span>
+				<span class="unit">{t('common.mm')}</span>
 			</label>
-			<label class="field"><span>Y</span>
+			<label class="field"><span>{t('area.y')}</span>
 				<input
 					class="n-4"
 					type="number"
@@ -1145,24 +1139,24 @@
 					value={refY}
 					disabled={boxFrozen || !!selected.anchor}
 					title={selected.anchor
-						? `Anchored: the gap sets the top edge — this is the ${REF_Y[reference.fy]}`
-						: `The ${REF_Y[reference.fy]} — where the words are set from${ringNote}`}
+						? t('area.refYAnchoredTitle', { edge: REF_Y[reference.fy] })
+						: t('area.refYTitle', { edge: REF_Y[reference.fy], ring })}
 					onchange={(e) => patch({ y: round2(numeric(e, refY) - selected.h * reference.fy) })}
 				/>
-				<span class="unit">mm</span>
+				<span class="unit">{t('common.mm')}</span>
 			</label>
-			<label class="field"><span>W</span>
+			<label class="field"><span>{t('area.w')}</span>
 				<input class="n-4" type="number" step="0.5" min={MIN_BOX} value={selected.w} disabled={boxFrozen} onchange={(e) => resize('w', e)} />
-				<span class="unit">mm</span>
+				<span class="unit">{t('common.mm')}</span>
 			</label>
-			<label class="field"><span>H</span>
+			<label class="field"><span>{t('area.h')}</span>
 				<input class="n-4" type="number" step="0.5" min={MIN_BOX} value={selected.h} disabled={boxFrozen} onchange={(e) => resize('h', e)} />
-				<span class="unit">mm</span>
+				<span class="unit">{t('common.mm')}</span>
 			</label>
 			<label class="field">
-				<span>Anchor</span>
+				<span>{t('area.anchor')}</span>
 				<select value={selected.anchor?.to ?? ''} disabled={boxFrozen} onchange={(e) => setAnchor(e.currentTarget.value)}>
-					<option value="">— Fixed Y —</option>
+					<option value="">{t('area.fixedY')}</option>
 					{#each anchorOptions as box (box.id)}
 						<option value={box.id}>{box.slot ?? box.id}</option>
 					{/each}
@@ -1170,19 +1164,19 @@
 			</label>
 			{#if selected.anchor}
 				<label class="field">
-					<span>Gap</span>
+					<span>{t('area.gap')}</span>
 					<!-- No floor: a negative gap tucks this area up under the one it
 					     follows, overlapping it, which is a layout people want. -->
 					<input
 						class="n-3"
 						type="number"
 						step="0.5"
-						title="Between that area's bottom and this one's top; below 0 overlaps it"
+						title={t('area.betweenAreasBottomOnesTitle')}
 						value={selected.anchor.gap}
 						disabled={boxFrozen}
 						onchange={(e) => patch({ anchor: { to: selected.anchor!.to, gap: numeric(e, selected.anchor!.gap) } })}
 					/>
-					<span class="unit">mm</span>
+					<span class="unit">{t('common.mm')}</span>
 				</label>
 			{/if}
 			<!-- Only where there is a fold to mirror across: on a run of identical
@@ -1192,20 +1186,20 @@
 					<input
 						type="checkbox"
 						checked={selected.mirror !== false}
-						title="Mirror this area across the fold onto left-hand pages, so it keeps its distance from the outer edge and its inner side stays on the fold. Off pins it to the same millimetres on every page"
+						title={t('area.mirrorAreaAcrossFoldTitle')}
 						disabled={boxFrozen}
 						onchange={(e) => patch({ mirror: e.currentTarget.checked ? undefined : false })}
 					/>
-					Fold Follow
+					{t('area.foldFollow')}
 				</label>
 			{/if}
 			<label class="field">
-				<span>Rotation</span>
+				<span>{t('area.rotation')}</span>
 				<input
 					class="n-3"
 					type="number"
 					step="1"
-					title="Degrees clockwise; the box turns about the centre marked on it"
+					title={t('area.degreesClockwiseBoxTurnsTitle')}
 					value={selected.rotation ?? 0}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ rotation: normaliseRotation(numeric(e, 0)) })}
@@ -1221,8 +1215,8 @@
 						step="5"
 						min="0"
 						max="100"
-						aria-label="Centre X"
-						title="The pivot across the box, as a percentage of its width"
+						aria-label={t('area.centreXLabel')}
+						title={t('area.pivotAcrossBoxPercentageTitle')}
 						value={selected.centre?.x ?? 50}
 						disabled={boxFrozen}
 						onchange={(e) => setCentre({ x: numeric(e, 50) })}
@@ -1236,8 +1230,8 @@
 						step="5"
 						min="0"
 						max="100"
-						aria-label="Centre Y"
-						title="The pivot down the box, as a percentage of its height"
+						aria-label={t('area.centreYLabel')}
+						title={t('area.pivotDownBoxPercentageTitle')}
 						value={selected.centre?.y ?? 50}
 						disabled={boxFrozen}
 						onchange={(e) => setCentre({ y: numeric(e, 50) })}
@@ -1249,27 +1243,27 @@
 		<!-- Lines are the words' to have; a QR code has none. -->
 		{#if selected.mode !== 'qr'}
 		<fieldset class="group">
-			<legend>Lines</legend>
+			<legend>{t('area.lines')}</legend>
 			<label class="field">
-				<span>Leading</span>
+				<span>{t('area.leading')}</span>
 				<input
 					class="n-3"
 					type="number"
 					step="0.05"
 					min="0.8"
 					placeholder={String(template.defaults.lineHeight)}
-					title="Blank inherits the page's {template.defaults.lineHeight}"
+					title={t('area.leadingTitle', { leading: template.defaults.lineHeight })}
 					value={selected.lineHeight ?? ''}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ lineHeight: inherited(e, MIN_LEADING) })}
 				/>
 				{#if selected.lineHeight !== undefined}
-					<ResetButton to="the page's {template.defaults.lineHeight}" disabled={boxFrozen} onclick={() => patch({ lineHeight: undefined })} />
+					<ResetButton to={t('reset.pageValue', { value: template.defaults.lineHeight })} disabled={boxFrozen} onclick={() => patch({ lineHeight: undefined })} />
 				{/if}
 			</label>
 			{#if selected.mode === 'plain' || selected.mode === 'markdown'}
 				<label class="field">
-					<span>Baseline</span>
+					<span>{t('area.baseline')}</span>
 					<input
 						class="n-3"
 						type="number"
@@ -1278,15 +1272,15 @@
 						max={MAX_BASELINE}
 						placeholder={String(baselineOf({ font: selected.font }, template.defaults))}
 						title={pageBaselineApplies
-							? 'Raise the text by this much of its size, or lower it below 0. Blank takes the page\'s'
-							: 'Raise the text by this much of its size, or lower it below 0. The page\'s is for its own font, so an area in another starts at 0'}
+							? t('area.baselineTitle')
+							: t('area.baselineOtherFontTitle')}
 						value={selected.baseline ?? ''}
 						disabled={boxFrozen}
 						onchange={(e) => patch({ baseline: normaliseBaseline(e.currentTarget.value) })}
 					/>
-					<span class="unit">em</span>
+					<span class="unit">{t('area.em')}</span>
 					{#if selected.baseline !== undefined}
-						<ResetButton to="the page's baseline" disabled={boxFrozen} onclick={() => patch({ baseline: undefined })} />
+						<ResetButton to={t('reset.pageBaseline')} disabled={boxFrozen} onclick={() => patch({ baseline: undefined })} />
 					{/if}
 				</label>
 			{/if}
@@ -1294,7 +1288,7 @@
 				<!-- Blank, or 1, is one column — the field gone, as every other
 				     "not set" is. The gap only while there are columns to have one. -->
 				<label class="field">
-					<span>Columns</span>
+					<span>{t('area.columns')}</span>
 					<input
 						class="n-2"
 						type="number"
@@ -1302,7 +1296,7 @@
 						min="1"
 						max={MAX_COLUMNS}
 						placeholder="1"
-						title="Set the words in 2 to {MAX_COLUMNS} columns side by side; blank or 1 for one"
+						title={t('area.columnsTitle', { max: MAX_COLUMNS })}
 						value={selected.columns?.count ?? ''}
 						disabled={boxFrozen}
 						onchange={(e) =>
@@ -1317,45 +1311,45 @@
 				</label>
 				{#if selected.columns}
 					<label class="field">
-						<span>Gap</span>
+						<span>{t('area.gap')}</span>
 						<input
 							class="n-3"
 							type="number"
 							step="0.5"
 							min="0"
-							title="Between one column and the next"
+							title={t('area.betweenOneColumnNextTitle')}
 							value={selected.columns.gap}
 							disabled={boxFrozen}
 							onchange={(e) => patch({ columns: normaliseColumns({ ...selected.columns, gap: numeric(e, selected.columns!.gap) }) })}
 						/>
-						<span class="unit">mm</span>
+						<span class="unit">{t('common.mm')}</span>
 					</label>
 					<!-- How many of a paragraph's lines stay together where a column
 					     breaks it: at the foot of the column, and at the head of the
 					     next. Shown at their value, 2 and 3 until changed. -->
 					<label class="field">
-						<span>Orphans</span>
+						<span>{t('area.orphans')}</span>
 						<input
 							class="n-2"
 							type="number"
 							step="1"
 							min="1"
 							max={MAX_KEEP_LINES}
-							title="The fewest lines of a paragraph left at the foot of a column — fewer, and the paragraph starts in the next one"
+							title={t('area.fewestLinesParagraphLeftTitle')}
 							value={selected.columns.orphans ?? DEFAULT_ORPHANS}
 							disabled={boxFrozen}
 							onchange={(e) => patch({ columns: normaliseColumns({ ...selected.columns, orphans: e.currentTarget.value }) })}
 						/>
 					</label>
 					<label class="field">
-						<span>Widows</span>
+						<span>{t('area.widows')}</span>
 						<input
 							class="n-2"
 							type="number"
 							step="1"
 							min="1"
 							max={MAX_KEEP_LINES}
-							title="The fewest lines of a paragraph carried to the head of the next column"
+							title={t('area.fewestLinesParagraphCarriedTitle')}
 							value={selected.columns.widows ?? DEFAULT_WIDOWS}
 							disabled={boxFrozen}
 							onchange={(e) => patch({ columns: normaliseColumns({ ...selected.columns, widows: e.currentTarget.value }) })}
@@ -1366,122 +1360,122 @@
 			<!-- How one paragraph is told from the next: a space in lines of this
 			     leading, or an indent in em. -->
 			<label class="field">
-				<span>Paragraph</span>
+				<span>{t('area.paragraph')}</span>
 				<select
 					class:inherits={!selected.paragraph}
 					value={selected.paragraph?.mode ?? ''}
-					title="Space after each paragraph, or the first line of the next indented. Every line of plain text is a paragraph"
+					title={t('area.spaceAfterEachParagraphTitle')}
 					disabled={boxFrozen}
 					onchange={(e) => setParagraph(e.currentTarget.value)}
 				>
-					<option value="">Default: {template.defaults.paragraph ? PARAGRAPH_LABELS[template.defaults.paragraph.mode] : 'Continuous'}</option>
-					<option value="space">Space After</option>
-					<option value="indent">Indent</option>
+					<option value="">{t('common.defaultValue', { value: t(template.defaults.paragraph ? PARAGRAPH_LABELS[template.defaults.paragraph.mode] : 'area.paragraph.continuous') })}</option>
+					<option value="space">{t('area.spaceAfter')}</option>
+					<option value="indent">{t('area.indent')}</option>
 				</select>
 			</label>
 			{#if selected.paragraph}
 				<label class="field">
-					<span class="sr-only">Paragraph amount</span>
+					<span class="sr-only">{t('area.paragraphAmount')}</span>
 					<input
 						class="n-2"
 						type="number"
 						step="0.25"
 						min="0"
 						max={MAX_PARAGRAPH}
-						title={selected.paragraph.mode === 'space' ? "In lines of this area's leading" : 'In em of the type size'}
+						title={t(selected.paragraph.mode === 'space' ? 'area.paragraphSpaceTitle' : 'area.paragraphIndentTitle')}
 						value={selected.paragraph.amount}
 						disabled={boxFrozen}
 						onchange={(e) => setParagraph(selected.paragraph!.mode, numeric(e, selected.paragraph!.amount))}
 					/>
-					<span class="unit">{selected.paragraph.mode === 'space' ? 'lines' : 'em'}</span>
-					<ResetButton to="the page's paragraphs" disabled={boxFrozen} onclick={() => patch({ paragraph: undefined })} />
+					<span class="unit">{t(selected.paragraph.mode === 'space' ? 'area.unitLines' : 'area.em')}</span>
+					<ResetButton to={t('reset.pageParagraphs')} disabled={boxFrozen} onclick={() => patch({ paragraph: undefined })} />
 				</label>
 			{/if}
 			<!-- With the paragraphs, since it is how a line of one is set. -->
 			<label class="field">
-				<span>Leader</span>
+				<span>{t('area.leader')}</span>
 				<select
 					class:inherits={!selected.leader}
 					value={selected.leader ?? ''}
-					title="A line with %%% in it sets what follows against the right edge, joined by this line — Coffee %%% 3.50 for a price list; with a leader set, a tab does too"
+					title={t('area.lineSetsWhatFollowsTitle')}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ leader: (e.currentTarget.value || undefined) as Box['leader'] })}
 				>
-					<option value="">Default: {LEADER_LABELS[template.defaults.leader ?? 'none']}</option>
+					<option value="">{t('common.defaultValue', { value: t(LEADER_LABELS[template.defaults.leader ?? 'none']) })}</option>
 					{#each LEADERS as leader (leader)}
-						<option value={leader}>{LEADER_LABELS[leader]}</option>
+						<option value={leader}>{t(LEADER_LABELS[leader])}</option>
 					{/each}
 				</select>
 				{#if selected.leader}
-					<ResetButton to="the page's leader" disabled={boxFrozen} onclick={() => patch({ leader: undefined })} />
+					<ResetButton to={t('reset.pageLeader')} disabled={boxFrozen} onclick={() => patch({ leader: undefined })} />
 				{/if}
 			</label>
 		</fieldset>
 		{/if}
 		{#if selected.mode === 'markdown'}
 			<fieldset class="group">
-				<legend>Lists</legend>
+				<legend>{t('area.lists')}</legend>
 				<label class="field">
-					<span>Marker</span>
+					<span>{t('area.marker')}</span>
 					<select
 						class:inherits={!selected.list?.marker}
 						value={selected.list?.marker ?? ''}
-						title="What each item of a bullet list is marked with — a numbered list counts by Numbers"
+						title={t('area.whatEachItemBulletTitle')}
 						disabled={boxFrozen}
 						onchange={(e) => setList({ marker: e.currentTarget.value || undefined })}
 					>
-						<option value="">Default: {LIST_MARKER_LABELS[template.defaults.list?.marker ?? 'bullet']}</option>
+						<option value="">{t('common.defaultValue', { value: t(LIST_MARKER_LABELS[template.defaults.list?.marker ?? 'bullet']) })}</option>
 						{#each LIST_MARKERS as marker (marker)}
-							<option value={marker}>{LIST_MARKER_LABELS[marker]}</option>
+							<option value={marker}>{t(LIST_MARKER_LABELS[marker])}</option>
 						{/each}
 					</select>
 					{#if selected.list?.marker}
-						<ResetButton to="the page's list marker" disabled={boxFrozen} onclick={() => setList({ marker: undefined })} />
+						<ResetButton to={t('reset.pageListMarker')} disabled={boxFrozen} onclick={() => setList({ marker: undefined })} />
 					{/if}
 				</label>
 				<label class="field">
-					<span>Numbers</span>
+					<span>{t('area.numbers')}</span>
 					<select
 						class:inherits={!selected.list?.numbering}
 						value={selected.list?.numbering ?? ''}
-						title="How a numbered list counts: numbers, letters or Roman numerals"
+						title={t('area.howNumberedListCountsTitle')}
 						disabled={boxFrozen}
 						onchange={(e) => setList({ numbering: e.currentTarget.value || undefined })}
 					>
-						<option value="">Default: {LIST_NUMBERING_LABELS[template.defaults.list?.numbering ?? 'decimal']}</option>
+						<option value="">{t('common.defaultValue', { value: t(LIST_NUMBERING_LABELS[template.defaults.list?.numbering ?? 'decimal']) })}</option>
 						{#each LIST_NUMBERINGS as numbering (numbering)}
-							<option value={numbering}>{LIST_NUMBERING_LABELS[numbering]}</option>
+							<option value={numbering}>{t(LIST_NUMBERING_LABELS[numbering])}</option>
 						{/each}
 					</select>
 					{#if selected.list?.numbering}
 						<ResetButton
-							to="the page's list numbering"
+							to={t('reset.pageListNumbering')}
 							disabled={boxFrozen}
 							onclick={() => setList({ numbering: undefined })}
 						/>
 					{/if}
 				</label>
 				<label class="field">
-					<span>Indent</span>
+					<span>{t('area.indent')}</span>
 					<input
 						class="n-3"
 						type="number"
 						step="0.25"
 						min="0"
 						max={MAX_LIST}
-						placeholder={template.defaults.list?.indent !== undefined ? String(template.defaults.list.indent) : 'auto'}
-						title="From the area's edge to a list's markers, in em of the type size; blank takes the page's"
+						placeholder={template.defaults.list?.indent !== undefined ? String(template.defaults.list.indent) : t('common.auto')}
+						title={t('area.areasEdgeListsMarkersTitle')}
 						value={selected.list?.indent ?? ''}
 						disabled={boxFrozen}
 						onchange={(e) => setList({ indent: e.currentTarget.value })}
 					/>
-					<span class="unit">em</span>
+					<span class="unit">{t('area.em')}</span>
 					{#if selected.list?.indent !== undefined}
-						<ResetButton to="the page's list indent" disabled={boxFrozen} onclick={() => setList({ indent: '' })} />
+						<ResetButton to={t('reset.pageListIndent')} disabled={boxFrozen} onclick={() => setList({ indent: '' })} />
 					{/if}
 				</label>
 				<label class="field">
-					<span>Leading</span>
+					<span>{t('area.leading')}</span>
 					<!-- A multiple of the size, like the area's own leading, which is
 					     where a list with none of its own takes it from. -->
 					<input
@@ -1491,38 +1485,38 @@
 						min={MIN_LEADING}
 						max="3"
 						placeholder={String(listLeadingFallback)}
-						title="The list's own leading. Blank takes {template.defaults.list?.leading !== undefined ? "the page's for lists" : "this area's"}"
+						title={t('area.listLeadingTitle', { from: template.defaults.list?.leading !== undefined ? 'page' : 'area' })}
 						value={selected.list?.leading ?? ''}
 						disabled={boxFrozen}
 						onchange={(e) => setList({ leading: e.currentTarget.value })}
 					/>
 					{#if selected.list?.leading !== undefined}
-						<ResetButton to={template.defaults.list?.leading !== undefined ? "the page's list leading" : "this area's leading"} disabled={boxFrozen} onclick={() => setList({ leading: '' })} />
+						<ResetButton to={t(template.defaults.list?.leading !== undefined ? 'reset.pageListLeading' : 'reset.areaLeading')} disabled={boxFrozen} onclick={() => setList({ leading: '' })} />
 					{/if}
 				</label>
 			</fieldset>
 		{/if}
 		<fieldset class="group">
-			<legend>Box</legend>
+			<legend>{t('area.box')}</legend>
 			<label class="field">
-				<span>Fill</span>
+				<span>{t('area.fill')}</span>
 				<select
 					value={selected.background ? 'solid' : 'none'}
-					title="A fill behind this box; transparent lets the paper through"
+					title={t('area.fillBehindBoxTransparentTitle')}
 					disabled={boxFrozen}
 					onchange={(e) => setFill(e.currentTarget.value === 'solid')}
 				>
-					<option value="none">None</option>
-					<option value="solid">Solid</option>
+					<option value="none">{t('area.none')}</option>
+					<option value="solid">{t('area.solid')}</option>
 				</select>
 			</label>
 			{#if selected.background}
 				<span class="field">
-					<span class="sr-only">Fill Color</span>
+					<span class="sr-only">{t('area.fillColor')}</span>
 					<ColorField
 						value={selected.background}
 						fallback="#ffffff"
-						label="Fill color"
+						label={t('area.fillColorLabel')}
 						hueFrom={selected.colorFrom?.fill}
 						preview={previewOf('fill')}
 						disabled={boxFrozen}
@@ -1530,22 +1524,22 @@
 					/>
 				</span>
 			{/if}
-			<span class="field">{@render fromColumn('fill', 'fill')}</span>
+			<span class="field">{@render fromColumn('fill')}</span>
 			<span class="field">
-				<span>Border</span>
+				<span>{t('area.border')}</span>
 				{#if showSides}
-					{#each EDGES as edge (edge.key)}
+					{#each EDGES as edge (edge)}
 						<label class="field tight">
-							<span class="edge">{edge.label}</span>
+							<span class="edge">{t('edge.short', { edge })}</span>
 							<input
 								class="n-2"
 								type="number"
 								step="0.1"
 								min="0"
-								aria-label="{edge.label} border width"
-								value={sides[edge.key]}
+								aria-label={t('area.edgeBorderLabel', { edge })}
+								value={sides[edge]}
 								disabled={boxFrozen}
-								onchange={(e) => setEdge(edge.key, numeric(e, 0))}
+								onchange={(e) => setEdge(edge, numeric(e, 0))}
 							/>
 						</label>
 					{/each}
@@ -1555,19 +1549,19 @@
 						type="number"
 						step="0.1"
 						min="0"
-						aria-label="Border width"
-						title="The border sits inside the box's millimetres, not outside them"
+						aria-label={t('area.borderWidthLabel')}
+						title={t('area.borderSitsInsideBoxsTitle')}
 						value={typeof selected.borderWidth === 'number' ? selected.borderWidth : 0}
 						disabled={boxFrozen}
 						onchange={(e) => setBorder(numeric(e, 0))}
 					/>
 				{/if}
-				<span class="unit">mm</span>
+				<span class="unit">{t('common.mm')}</span>
 				<button
 					class="square"
 					aria-pressed={showSides}
-					title={showSides ? 'One thickness all round' : 'A thickness per edge'}
-					aria-label="Per-edge border widths"
+					title={t(showSides ? 'area.bordersTogether' : 'area.bordersApart')}
+					aria-label={t('area.perEdgeBorderWidthsLabel')}
 					disabled={boxFrozen}
 					onclick={() => {
 						// Leaving per-edge mode with uneven edges would silently discard
@@ -1582,31 +1576,31 @@
 
 			{#if selected.borderWidth}
 				<label class="field">
-					<span class="sr-only">Border Style</span>
+					<span class="sr-only">{t('area.borderStyle')}</span>
 					<select
-						title="Border style, for the whole box"
+						title={t('area.borderStyleWholeBoxTitle')}
 						value={selected.borderStyle ?? 'solid'}
 						disabled={boxFrozen}
 						onchange={(e) => patch({ borderStyle: e.currentTarget.value as BorderStyle })}
 					>
 						{#each BORDER_STYLES as style (style)}
-							<option value={style}>{STYLE_LABELS[style]}</option>
+							<option value={style}>{t(STYLE_LABELS[style])}</option>
 						{/each}
 					</select>
 				</label>
 				<span class="field">
-					<span class="sr-only">Border Color</span>
+					<span class="sr-only">{t('area.borderColor')}</span>
 					<ColorField
 						value={selected.borderColor}
 						fallback={selected.color ?? template.defaults.color}
-						label="Border color"
+						label={t('area.borderColorLabel')}
 						hueFrom={selected.colorFrom?.border}
 						preview={previewOf('border')}
-						title="Border color; follows the text color until you set one"
+						title={t('area.borderColorFollowsTextTitle')}
 						disabled={boxFrozen}
 						onchange={(v) => patch({ borderColor: v })}
 					/>
-					{@render fromColumn('border', 'border color')}
+					{@render fromColumn('border')}
 				</span>
 				<!-- A setting that is on or off, so a checkbox, like Mirror and Hide
 				     When Empty: a pencil that stayed pressed was a button nobody
@@ -1616,43 +1610,43 @@
 					<input
 						type="checkbox"
 						checked={!!selected.borderHand}
-						title="Draw the border by hand: the same width, style and radius, wobbling. The line is the same on every card — it is drawn from this area's own name, not from chance"
+						title={t('area.drawBorderHandSameTitle')}
 						disabled={boxFrozen}
 						onchange={(e) => patch({ borderHand: e.currentTarget.checked ? true : undefined })}
 					/>
-					Draft
+					{t('area.draft')}
 				</label>
 			{/if}
 
 			<label class="field">
-				<span>Radius</span>
+				<span>{t('area.radius')}</span>
 				<input
 					class="n-3"
 					type="number"
 					step="0.5"
 					min="0"
-					title="Corner radius, for the whole box"
+					title={t('area.cornerRadiusWholeBoxTitle')}
 					value={selected.borderRadius ?? 0}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ borderRadius: Math.max(0, numeric(e, 0)) || undefined })}
 				/>
-				<span class="unit">mm</span>
+				<span class="unit">{t('common.mm')}</span>
 			</label>
 			<span class="field">
-				<span>Padding</span>
+				<span>{t('area.paddingLabel')}</span>
 				{#if showPadSides}
-					{#each EDGES as edge (edge.key)}
+					{#each EDGES as edge (edge)}
 						<label class="field tight">
-							<span class="edge">{edge.label}</span>
+							<span class="edge">{t('edge.short', { edge })}</span>
 							<input
 								class="n-2"
 								type="number"
 								step="0.5"
 								min="0"
-								aria-label="{edge.label} padding"
-								value={padSides[edge.key]}
+								aria-label={t('area.edgePaddingLabel', { edge })}
+								value={padSides[edge]}
 								disabled={boxFrozen}
-								onchange={(e) => setPadEdge(edge.key, numeric(e, 0))}
+								onchange={(e) => setPadEdge(edge, numeric(e, 0))}
 							/>
 						</label>
 					{/each}
@@ -1662,19 +1656,19 @@
 						type="number"
 						step="0.5"
 						min="0"
-						aria-label="Padding"
-						title="Space between the border and the content, inside the box's millimetres"
+						aria-label={t('area.paddingLabel')}
+						title={t('area.spaceBetweenBorderContentTitle')}
 						value={typeof selected.padding === 'number' ? selected.padding : 0}
 						disabled={boxFrozen}
 						onchange={(e) => setPadding(numeric(e, 0))}
 					/>
 				{/if}
-				<span class="unit">mm</span>
+				<span class="unit">{t('common.mm')}</span>
 				<button
 					class="square"
 					aria-pressed={showPadSides}
-					title={showPadSides ? 'One padding all round' : 'A padding per edge'}
-					aria-label="Per-edge padding"
+					title={t(showPadSides ? 'area.paddingTogether' : 'area.paddingApart')}
+					aria-label={t('area.perEdgePaddingLabel')}
 					disabled={boxFrozen}
 					onclick={() => {
 						// Same bargain as the border: collapse to the top edge rather
@@ -1687,42 +1681,42 @@
 				</button>
 			</span>
 			<label class="field">
-				<span>Overflow</span>
+				<span>{t('area.overflow')}</span>
 				<select
 					value={selected.overflow}
-					title="Clip cuts off what does not fit in the box's millimetres; Grow lets the box get taller to hold it; Shrink keeps the height and sets the words smaller until they fit, down to half their size" disabled={boxFrozen} onchange={(e) => patch({ overflow: e.currentTarget.value as Box['overflow'] })}>
-					<option value="clip">Clip</option>
-					<option value="grow">Grow</option>
-					<option value="shrink">Shrink</option>
+					title={t('area.clipCutsOffWhatTitle')} disabled={boxFrozen} onchange={(e) => patch({ overflow: e.currentTarget.value as Box['overflow'] })}>
+					<option value="clip">{t('area.clip')}</option>
+					<option value="grow">{t('area.grow')}</option>
+					<option value="shrink">{t('area.shrink')}</option>
 				</select>
 			</label>
 		</fieldset>
 		<fieldset class="group">
-			<legend>Effects</legend>
+			<legend>{t('area.effects')}</legend>
 			<label class="field">
-				<span>Blend</span>
+				<span>{t('area.blend')}</span>
 				<select
 					value={selected.blend ?? ''}
-					title="How this area meets what is under it — the paper, its own background image, and any area it overlaps. Multiply is ink on paper. Prints only with background graphics on, like the paper colour"
+					title={t('area.howAreaMeetsWhatTitle')}
 					disabled={boxFrozen}
 					onchange={(e) => patch({ blend: (e.currentTarget.value || undefined) as Box['blend'] })}
 				>
-					<option value="">Normal</option>
+					<option value="">{t('area.normal')}</option>
 					{#each BLEND_MODES as mode (mode)}
-						<option value={mode}>{BLEND_LABELS[mode]}</option>
+						<option value={mode}>{t(BLEND_LABELS[mode])}</option>
 					{/each}
 				</select>
 			</label>
 
 			<label class="field">
-				<span>Opacity</span>
+				<span>{t('area.opacity')}</span>
 				<input
 					class="n-3"
 					type="number"
 					step="5"
 					min="0"
 					max="100"
-					title="How much of what is under this area shows through it. Fades the fill, the border and the content together"
+					title={t('area.howMuchWhatUnderTitle')}
 					value={Math.round((selected.opacity ?? 1) * 100)}
 					disabled={boxFrozen}
 					onchange={(e) => {

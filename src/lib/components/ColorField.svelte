@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '$lib/i18n';
 	import { fromRgba, toRgba } from '$lib/color';
 
 	/**
@@ -80,8 +81,8 @@
 		disabled={disabled || !!fromRow}
 		title={hueFrom
 			? fromRow
-				? `This row's ${hueFrom} — the color comes from that column`
-				: `This row's ${hueFrom} holds no color, so this one is used`
+				? t('colorField.fromRow', { column: hueFrom })
+				: t('colorField.rowHasNoColor', { column: hueFrom })
 			: undefined}
 		aria-label={label}
 		onchange={(e) => setHue(e.currentTarget.value)}
@@ -94,8 +95,8 @@
 		step="5"
 		value={percent}
 		{disabled}
-		aria-label="{label} opacity, percent"
-		title="Opacity, in percent"
+		aria-label={t('colorField.opacityLabel', { label })}
+		title={t('colorField.opacityTitle')}
 		onchange={(e) => setAlpha(e.currentTarget)}
 	/>
 	<span class="unit" aria-hidden="true">%</span>

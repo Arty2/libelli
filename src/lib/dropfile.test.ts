@@ -21,7 +21,8 @@ describe('droppedKind', () => {
 		expect(droppedKind({ name: 'notes.pdf', type: 'application/pdf' })).toBe('unknown');
 	});
 
-	it('takes a ZIP as an archive, whatever type the system gives it', () => {
+	it('takes an IDML and a ZIP as archives, whatever type the system gives them', () => {
+		expect(droppedKind({ name: 'Poster.idml', type: '' })).toBe('archive');
 		expect(droppedKind({ name: 'Poster package.zip', type: 'application/x-zip-compressed' })).toBe('archive');
 		expect(droppedKind({ name: 'Poster', type: 'application/zip' })).toBe('archive');
 	});
@@ -88,6 +89,15 @@ describe('sameTemplate', () => {
 		// As the library keeps it: written through toFile, starter mark and all.
 		const stored = { ...toFile(normaliseTemplate(file)), starter: 'default' };
 		expect(sameTemplate(incoming, stored)).toBe(true);
+	});
+
+	it('knows one built in memory with its keys in another order', () => {
+		const stored = toFile(normaliseTemplate(file));
+		const built = importedTemplate(file);
+		const { image: _image, ...page } = { ...built.page, image: { src: 'art.png', source: 'local' as const, fit: 'cover' as const } };
+		const reordered = { ...built, page: { ...page, image: { src: 'art.png', source: 'local' as const, fit: 'cover' as const } } };
+		const withImage = toFile(normaliseTemplate({ ...stored, page: { ...stored.page, image: { src: 'art.png', source: 'local', fit: 'cover' } } }));
+		expect(sameTemplate(reordered, withImage)).toBe(true);
 	});
 
 	it('does not match one edited since', () => {

@@ -16,6 +16,8 @@
  * with the rest, for reading a white page in a dark room.
  */
 
+import type { MessageKey } from './i18n';
+
 import { local } from './storage';
 
 export const THEMES = ['light', 'dark', 'dark-page'] as const;
@@ -27,11 +29,18 @@ export type Theme = (typeof THEMES)[number];
  */
 export const THEME_KEY = 'ui:theme';
 
-/** What each one is called in the theme button's tooltip. */
-export const THEME_NAMES: Record<Theme, string> = {
-	light: 'Light',
-	dark: 'Dark',
-	'dark-page': 'Dark, with the page inverted'
+/** What each one is called in the theme button's tooltip, as catalogue keys. */
+export const THEME_NAMES: Record<Theme, MessageKey> = {
+	light: 'theme.light',
+	dark: 'theme.dark',
+	'dark-page': 'theme.darkPage'
+};
+
+/** The same, inside a sentence: “press for dark”. */
+export const THEME_LOWER: Record<Theme, MessageKey> = {
+	light: 'theme.lowerLight',
+	dark: 'theme.lowerDark',
+	'dark-page': 'theme.lowerDarkPage'
 };
 
 /** The Carbon glyph the toolbar's theme button wears for each. */

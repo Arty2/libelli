@@ -6,6 +6,7 @@
  * intent at all stays in `+page.svelte`, because it depends on live state: what
  * has focus, whether the lightbox is in front, whether the page is locked.
  */
+import { t, type MessageKey } from './i18n';
 import { GRID_MINOR } from './layout';
 
 /** Ctrl/Cmd+Shift turns the arrows into alignment, in the direction pressed. */
@@ -60,29 +61,32 @@ export function isAlignChord(event: Pick<KeyboardEvent, 'metaKey' | 'ctrlKey' | 
  * by hand drifted from the key actually listened for — Redo's title said
  * Ctrl+Shift+Z, which is the A/B toggle, while Redo is Ctrl+Y — so a title
  * that names a key takes it from here, and the README's table is the other
- * copy to keep in step.
+ * copy to keep in step. The words are the catalogue's, under `shortcut.*`.
  */
 export const SHORTCUTS = {
-	undo: 'Ctrl/Cmd+Z',
-	redo: 'Ctrl/Cmd+Y',
-	duplicate: 'Ctrl/Cmd+D',
-	lockArea: 'Ctrl/Cmd+L',
-	lockPage: 'Ctrl/Cmd+Shift+L',
-	delete: 'Delete',
-	copyStyle: 'Ctrl/Cmd+Shift+C',
-	pasteStyle: 'Ctrl/Cmd+Shift+V',
-	export: 'Ctrl/Cmd+P',
-	help: '?',
-	grid: "Ctrl/Cmd+' or Ctrl/Cmd+#",
-	guides: 'Ctrl/Cmd+; or |',
-	boxes: 'Ctrl/Cmd+H',
-	zoom: 'Ctrl/Cmd + and −, Ctrl/Cmd+0 to fit; with an area chosen, + and − size its type',
-	cards: 'arrows or PageUp/PageDown, with nothing selected',
-	type: 'Enter'
-} as const;
+	undo: 'shortcut.undo',
+	redo: 'shortcut.redo',
+	duplicate: 'shortcut.duplicate',
+	lockArea: 'shortcut.lockArea',
+	lockPage: 'shortcut.lockPage',
+	delete: 'shortcut.delete',
+	copyStyle: 'shortcut.copyStyle',
+	pasteStyle: 'shortcut.pasteStyle',
+	export: 'shortcut.export',
+	help: 'shortcut.help',
+	grid: 'shortcut.grid',
+	guides: 'shortcut.guides',
+	boxes: 'shortcut.boxes',
+	zoom: 'shortcut.zoom',
+	cards: 'shortcut.cards',
+	type: 'shortcut.type'
+} as const satisfies Record<string, MessageKey>;
 
 /** A title with its shortcut after it, in brackets, the way every tooltip says one. */
-export const withKey = (title: string, key: keyof typeof SHORTCUTS) => `${title} (${SHORTCUTS[key]})`;
+export const withKey = (title: string, key: keyof typeof SHORTCUTS) => t('common.withKey', { title, key: shortcut(key) });
+
+/** A shortcut as a tooltip names it, in the interface's words for the keys. */
+export const shortcut = (key: keyof typeof SHORTCUTS) => t(SHORTCUTS[key]);
 
 /**
  * The card a key moves to while the card is shown alone, full screen — a

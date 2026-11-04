@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '$lib/i18n';
 	/**
 	 * The template's own stylesheet, edited.
 	 *
@@ -210,7 +211,7 @@
 			bind:value
 			{placeholder}
 			{readonly}
-			aria-label="The template's CSS"
+			aria-label={t('css.editorLabel')}
 			spellcheck="false"
 			autocapitalize="off"
 			wrap={wrap ? 'soft' : 'off'}
