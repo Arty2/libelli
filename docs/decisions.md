@@ -645,6 +645,14 @@ own pixels; an address is dropped. Not well-formed means nothing is drawn —
 the trade for not guessing the way an HTML parser would. A `<style>` goes through
 `scopeCss`, since inline SVG's stylesheet reaches the whole document.
 
+**Checked as the page will read it, not as it was written.** The page's HTML
+parser lower-cases attribute names, so `HREF` is checked as `href`. A
+presentation attribute is CSS, so `fill` gets the same test as `style`,
+backslash escapes included. Inside an SVG the parser decodes entities in a
+`<style>` (outside one it does not), so the scoped stylesheet is escaped on the
+way out; otherwise `&#x75;rl(` would arrive as `url(`. The rewrite is
+remembered per source, since every card draws the same picture.
+
 ## `src/lib/css.ts`
 
 **The guards read what CSS reads, not what was typed.** `\75rl(` is `url(` and
@@ -655,7 +663,13 @@ digit is written, and decoding it would change what it selects. `image-set("…"
 and `src("…")` take a bare string as an address, so `neuterStrings` drops a call
 holding any string that is not a `data:` picture. Same family as `cssUrl` in
 `assets.ts`, which percent-encodes control characters: a line break ends a CSS
-string, and `new URL` ignores one when it validates.
+string, and `new URL` ignores one when it validates. A quoted `url("…")` is
+read to its closing quote: matching to the first `)` left
+`url("https://x/a).png")` whole.
+
+**Scoped once, not once per card.** Every card on the page asks for the same
+stylesheet, and the answer is a pure function of the text, so `scopeCss`
+remembers recent answers.
 
 **An area's name is its CSS id, and `cssIdent` is the one place a name becomes
 one.** A template's own CSS is the escape hatch for everything the bar does not
@@ -993,6 +1007,10 @@ source. Only `data:` pictures are cropped — that is where drawings live, and i
 is also the only kind a canvas will read back, since anything from elsewhere
 taints it and refuses `toDataURL`. The cost is that the crop is asynchronous: a
 card drawn in the very first frame tiles the whole board until the crop lands.
+Every card asking while a crop is worked out waits on that same promise: the
+first version answered all but the first with nothing, and since a card does
+not ask twice, a run of rows tiled the whole board on every card but one. The
+cache is bounded, because each saved stroke is a new source.
 
 **Content is one question with four answers, and the format did not change.**
 Reaching a drawing by setting a static area's *mode* to "Image / Color" asks the
