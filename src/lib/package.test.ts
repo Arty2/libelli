@@ -254,6 +254,12 @@ describe('what CSV and zipping tools lose', () => {
 		expect(readPackage(files, 'x').dataset.rows).toEqual(blank.rows);
 	});
 
+	it('does not invent a hundred thousand blank rows because a manifest says so', async () => {
+		const files = await unzip(bytesWith({ rows: 100_000 }));
+		const read = readPackage(files, 'x');
+		expect(read.dataset.rows.length).toBeLessThanOrEqual(table.rows.length + 1000);
+	});
+
 	it('opens a package zipped again as its folder, macOS clutter and all', async () => {
 		const files = await unzip(writePackage({ template: template(), dataset: table, mapping: {}, pictures: [{ name: 'soup.jpg', bytes: enc('JPEG') }], fonts: [] }));
 		const rezipped = new Map([...files].map(([path, bytes]) => [`Menu/${path}`, bytes] as [string, Uint8Array]));
