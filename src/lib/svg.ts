@@ -73,12 +73,22 @@ function write(element: XmlElement, scope: string): string {
 	return `<${element.name}${attrs}>${inner}</${element.name}>`;
 }
 
+/** Rewritten once per picture, not once per card it is drawn on. */
+const rewritten = new Map<string, string>();
+
 /** The SVG as the allowlist keeps it, or an empty string for what is not a well-formed SVG. */
 export function safeSvg(source: string, scope = '.media'): string {
+	const key = `${scope}\u0000${source}`;
+	const held = rewritten.get(key);
+	if (held !== undefined) return held;
+	let out = '';
 	try {
 		const root = parseXml(source);
-		return root.name === 'svg' ? write(root, scope) : '';
+		out = root.name === 'svg' ? write(root, scope) : '';
 	} catch {
-		return '';
+		// Not well-formed: drawn as nothing, and remembered as nothing.
 	}
+	if (rewritten.size >= 64) rewritten.clear();
+	rewritten.set(key, out);
+	return out;
 }

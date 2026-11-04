@@ -91,8 +91,10 @@ function settle(dataset: Dataset, order: number[] | undefined): Dataset {
 
 /** Ranks, so an order with gaps in it (rows deleted) counts 0, 1, 2… again. */
 function compact(order: number[]): number[] {
-	const ranked = [...order].sort((a, b) => a - b);
-	return order.map((n) => ranked.indexOf(n));
+	// A rank looked up, not searched for: `indexOf` per row made deleting from
+	// a sorted table of twenty thousand rows a quarter of a second.
+	const rank = new Map([...order].sort((a, b) => a - b).map((n, i) => [n, i]));
+	return order.map((n) => rank.get(n)!);
 }
 
 /**

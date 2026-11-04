@@ -17,12 +17,19 @@
 import { t } from './i18n';
 import { inkBounds } from './bitmap';
 
-/** src -> what to tile instead. A drawing's own URL when there is nothing to trim. */
-const crops = new Map<string, string>();
-const asked = new Set<string>();
+/**
+ * src -> what to tile instead, a drawing's own URL when there is nothing to
+ * trim; or the crop still being worked out. Bounded: each stroke saved is a
+ * new data URL, and an afternoon's drawing kept every board ever made.
+ */
+const crops = new Map<string, string | Promise<string>>();
+const MAX_CROPS = 64;
 
 /** What has already been worked out for this source, if anything. */
-export const tileOf = (src: string): string | undefined => crops.get(src);
+export const tileOf = (src: string): string | undefined => {
+	const held = crops.get(src);
+	return typeof held === 'string' ? held : undefined;
+};
 
 export const croppable = (src: string | undefined): src is string => !!src?.startsWith('data:');
 
@@ -36,20 +43,28 @@ function drawn(src: string): Promise<HTMLImageElement> {
 }
 
 /**
- * The cropped source for a drawing, worked out once and remembered. Answers
- * `null` while it is still being worked out — the caller tiles the whole board
- * until then, which is what it did before this existed.
+ * The cropped source for a drawing, worked out once and remembered. Every
+ * caller asking while it is worked out gets the same answer when it comes:
+ * one card per row asks at once, and answering all but the first with
+ * nothing left those tiling the whole board for good.
  */
-export async function cropToInk(src: string): Promise<string | null> {
+export function cropToInk(src: string): Promise<string | null> {
+	if (typeof document === 'undefined' || !croppable(src)) return Promise.resolve(null);
 	const held = crops.get(src);
-	if (held) return held;
+	if (held !== undefined) return Promise.resolve(held);
 	// One canvas per source, however many cards hold it: a run of two hundred
 	// rows shares one drawing, and decoding it two hundred times to reach the
 	// same answer is the sort of thing that makes a preview stutter.
-	if (asked.has(src)) return null;
-	asked.add(src);
-	if (typeof document === 'undefined' || !croppable(src)) return null;
+	if (crops.size >= MAX_CROPS) crops.clear();
+	const working = crop(src).then((tile) => {
+		crops.set(src, tile);
+		return tile;
+	});
+	crops.set(src, working);
+	return working;
+}
 
+async function crop(src: string): Promise<string> {
 	try {
 		const image = await drawn(src);
 		const w = image.naturalWidth;
@@ -58,26 +73,20 @@ export async function cropToInk(src: string): Promise<string | null> {
 		board.width = w;
 		board.height = h;
 		const ctx = board.getContext('2d', { willReadFrequently: true });
-		if (!ctx) return null;
+		if (!ctx) return src;
 		ctx.drawImage(image, 0, 0);
 		const bounds = inkBounds(ctx.getImageData(0, 0, w, h));
 		// Nothing drawn, or drawn to the edges: the board is the tile already.
-		if (!bounds || (bounds.w === w && bounds.h === h)) {
-			crops.set(src, src);
-			return src;
-		}
+		if (!bounds || (bounds.w === w && bounds.h === h)) return src;
 		const tile = document.createElement('canvas');
 		tile.width = bounds.w;
 		tile.height = bounds.h;
 		// A negative offset puts the ink at the origin and lets everything around
 		// it fall off the edges.
 		tile.getContext('2d')?.drawImage(image, -bounds.x, -bounds.y);
-		const cropped = tile.toDataURL('image/png');
-		crops.set(src, cropped);
-		return cropped;
+		return tile.toDataURL('image/png');
 	} catch {
 		// A picture that will not load or will not be read back tiles whole.
-		crops.set(src, src);
 		return src;
 	}
 }

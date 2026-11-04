@@ -116,7 +116,9 @@ describe('the digits under the bars', () => {
 	});
 
 	it('draws the bars alone without them', () => {
-		expect(barcodeSvg('400638133393', 'ean13')).not.toContain('<span');
+		const out = barcodeSvg('400638133393', 'ean13');
+		expect(out).not.toContain('<span');
+		expect(out).toMatch(/^<svg[\s\S]*<\/svg>$/);
 	});
 });
 

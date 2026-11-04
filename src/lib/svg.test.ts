@@ -11,11 +11,15 @@ describe('safeSvg', () => {
 		expect(out).toContain('<path d="M0 0L10 10" stroke="red"></path>');
 	});
 
-	it('removes a script and every handler, including the one with no space before it', () => {
-		for (const bad of ['<svg><script>alert(1)</script></svg>', '<svg/onload="alert(1)"/>', '<svg onload="alert(1)"><rect onclick="x()"/></svg>']) {
-			const out = safeSvg(bad);
-			expect(out).not.toMatch(/script|onload|onclick|alert/i);
-		}
+	it('removes a script and every handler, keeping the drawing round them', () => {
+		expect(safeSvg('<svg><script>alert(1)</script></svg>')).toBe('<svg></svg>');
+		expect(safeSvg('<svg onload="alert(1)"><rect onclick="x()"/></svg>')).toBe('<svg><rect></rect></svg>');
+	});
+
+	it('draws nothing for a handler with no space before it, which is not XML at all', () => {
+		// A browser's HTML parser reads `<svg/onload=…>` as a handler; the XML
+		// reader refuses it whole, so there is nothing left to guess at.
+		expect(safeSvg('<svg/onload="alert(1)"/>')).toBe('');
 	});
 
 	it('drops a link, an embedded page and an animation, which a printed card has no use for', () => {

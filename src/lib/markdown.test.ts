@@ -85,7 +85,7 @@ describe('inline', () => {
 	});
 
 	it('does not let bold be re-read as italic', () => {
-		expect(renderInline('**bold**')).not.toContain('<em>');
+		expect(renderInline('**bold**')).toBe('<strong>bold</strong>');
 	});
 
 	it('linkifies safe URLs only', () => {
@@ -122,7 +122,9 @@ describe('links', () => {
 	});
 
 	it('cannot be forged by a sentinel in the cell', () => {
-		expect(renderInline('\u00030\u0004 [x](https://a.example/)')).not.toContain('undefined');
+		const out = renderInline('\u00030\u0004 [x](https://a.example/)');
+		expect(out).not.toContain('undefined');
+		expect(out).toBe('0 <a href="https://a.example/" style="color:inherit">x</a>');
 	});
 });
 

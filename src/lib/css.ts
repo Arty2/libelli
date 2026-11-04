@@ -66,9 +66,23 @@ export function cssIdent(name: string): string {
  */
 export const isPageId = (ident: string): boolean => /^(cover|back-cover|inside-cover|inside-back-cover|page-\d+)$/.test(ident);
 
+/**
+ * Every card on the page asks for the same stylesheet — the editor, each
+ * sheet in print, every row the overflow probe lays out — so the answer is
+ * remembered. A string in, a string out: nothing to go stale.
+ */
+const scoped = new Map<string, string>();
+
 export function scopeCss(css: string, scope: string): string {
 	if (!css || !css.trim()) return '';
-	return scopeRules(sanitise(css), scope);
+	const key = `${scope}\u0000${css}`;
+	let out = scoped.get(key);
+	if (out === undefined) {
+		if (scoped.size >= 32) scoped.clear();
+		out = scopeRules(sanitise(css), scope);
+		scoped.set(key, out);
+	}
+	return out;
 }
 
 function sanitise(css: string): string {

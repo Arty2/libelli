@@ -49,7 +49,9 @@ describe('scopeCss', () => {
 	});
 
 	it('strips a closing style tag rather than letting a template break out into markup', () => {
-		expect(scoped('p { color: red }</style><script>alert(1)</script>')).not.toContain('script>');
+		const out = scoped('p { color: red }</style><script>alert(1)</script>');
+		expect(out).not.toContain('script>');
+		expect(out).toContain('.trim p { color: red }');
 	});
 
 	it('ignores a comment that would otherwise look like a rule', () => {
