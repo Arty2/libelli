@@ -18,6 +18,7 @@
  */
 
 import { local } from './storage';
+import type { MessageKey } from './i18n';
 
 export const OUTPUT_TURNS = ['auto', 'portrait', 'landscape'] as const;
 export type OutputTurn = (typeof OUTPUT_TURNS)[number];
@@ -25,10 +26,11 @@ export type OutputTurn = (typeof OUTPUT_TURNS)[number];
 /** Under storage.ts's `libelli:` prefix. */
 export const OUTPUT_TURN_KEY = 'ui:output-turn';
 
-export const OUTPUT_TURN_NAMES: Record<OutputTurn, string> = {
-	auto: 'Auto',
-	portrait: 'Portrait',
-	landscape: 'Landscape'
+/** Each choice's name, as a catalogue key: the words are i18n's. */
+export const OUTPUT_TURN_NAMES: Record<OutputTurn, MessageKey> = {
+	auto: 'print.orientation.auto',
+	portrait: 'print.orientation.portrait',
+	landscape: 'print.orientation.landscape'
 };
 
 export function readTurn(value: unknown): OutputTurn {

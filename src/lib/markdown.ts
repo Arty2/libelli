@@ -397,6 +397,19 @@ function unescapeEntities(text: string): string {
 const round = (v: number) => Math.round(v * 1000) / 1000;
 const mm = (v: number) => `${round(v)}mm`;
 
+/**
+ * Whether words would come out of this renderer as anything but themselves:
+ * a heading, a list or a rule, or emphasis, a code span, a highlight, a link
+ * or a coloured run inside a line. Asked by whatever wants to set words as
+ * Markdown that were never written as Markdown (idml.ts), here rather than
+ * as a copy of the syntax that drifts from it — there are no escapes, so the
+ * only safe answer for such words is to leave them plain.
+ */
+export function wouldFormat(src: string): boolean {
+	if (parseBlocks(src).some((block) => block.type !== 'paragraph')) return true;
+	return src.split('\n').some((line) => renderInline(line) !== escapeHtml(line));
+}
+
 export function renderMarkdown(src: string, options: MarkdownOptions): string {
 	const md = mergeStyle(options.md);
 	const list = options.list;

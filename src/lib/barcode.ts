@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { parseColor } from './color';
 import { escapeHtml } from './markdown';
 
@@ -63,10 +64,10 @@ function digitsFrom(text: string, at: number): number {
  * long number is half as wide again as it needs to be.
  */
 export function code128Values(text: string): number[] {
-	if (!text) throw new Error('Nothing to encode.');
+	if (!text) throw new Error(t('code.empty'));
 	for (const ch of text) {
 		const code = ch.charCodeAt(0);
-		if (code < 32 || code > 126) throw new Error(`Code 128 cannot encode ${JSON.stringify(ch)}.`);
+		if (code < 32 || code > 126) throw new Error(t('code.code128Char', { char: JSON.stringify(ch) }));
 	}
 	const values: number[] = [];
 	let set: 'B' | 'C';
@@ -154,7 +155,7 @@ export function eanDigits(text: string): string | null {
 /** EAN-13 as modules, for whatever `eanDigits` accepts. */
 export function ean13(text: string): boolean[] {
 	const all = eanDigits(text);
-	if (!all) throw new Error('EAN-13 takes 12 or 13 digits, with a right check digit, or an ISBN-10.');
+	if (!all) throw new Error(t('code.ean13Digits'));
 	const out: boolean[] = [];
 	widths('111', out);
 	const parity = EAN_PARITY[Number(all[0])];
@@ -224,7 +225,9 @@ export function barcodeSvg(text: string, kind: BarcodeKind, options: BarcodeSvgO
 	const modules = kind === 'ean13' ? ean13(text) : code128(text);
 	const color = parseColor(options.color ?? null) ?? '#000000';
 	const background = parseColor(options.background ?? null);
-	const label = kind === 'ean13' ? 'EAN-13 barcode' : 'Code 128 barcode';
+	const label = escapeHtml(t(kind === 'ean13' ? 'code.ean13Label' : 'code.code128Label'));
+	// One message with the value in it, escaped as a whole: a translator may move the colon.
+	const named = (value: string) => escapeHtml(t(kind === 'ean13' ? 'code.ean13Named' : 'code.code128Named', { text: value }));
 	if (!options.digits) {
 		return barsSvg(barsPath(modules), modules.length, color, label).replace(
 			'><path',
@@ -249,7 +252,7 @@ export function barcodeSvg(text: string, kind: BarcodeKind, options: BarcodeSvgO
 		`position:absolute;top:0.1em;left:${((from / total) * 100).toFixed(3)}%;width:${((width / total) * 100).toFixed(3)}%`;
 	if (kind === 'code128') {
 		return (
-			`<span style="${box}" role="img" aria-label="${label}: ${escapeHtml(text)}">` +
+			`<span style="${box}" role="img" aria-label="${named(text)}">` +
 			barsSvg(barsPath(modules), modules.length, color, '', stretch) +
 			`<span style="position:relative;flex:none;height:1.3em;padding-top:0.15em;box-sizing:border-box;text-align:center;white-space:nowrap;overflow:hidden" aria-hidden="true">${escapeHtml(text)}</span></span>`
 		);
@@ -262,7 +265,7 @@ export function barcodeSvg(text: string, kind: BarcodeKind, options: BarcodeSvgO
 	const group = (chars: string) =>
 		[...chars].map((d) => `<span style="flex:1;text-align:center">${d}</span>`).join('');
 	return (
-		`<span style="${box}" role="img" aria-label="${label}: ${digits}">` +
+		`<span style="${box}" role="img" aria-label="${named(digits)}">` +
 		barsSvg(barsPath(modules, LEFT), total, color, '', stretch) +
 		`<span style="${row}" aria-hidden="true">` +
 		barsSvg(barsPath(modules, LEFT, guard), total, color, '', 'position:absolute;inset:0;height:100%') +

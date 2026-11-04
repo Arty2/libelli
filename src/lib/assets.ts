@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { STORE_ASSETS, idbDelete, idbGet, idbKeys, idbSet, isReadOnly } from './storage';
 import type { PageBackgroundImage } from './types';
 
@@ -123,7 +124,9 @@ export function safeMediaUrl(raw: unknown): string | null {
 
 /** Kilobytes under a megabyte, one decimal above it; nobody wants 1483 KB. */
 export const weigh = (bytes: number) =>
-	bytes >= 1024 * 1024 ? `${Math.round((bytes / 1024 / 1024) * 10) / 10} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+	bytes >= 1024 * 1024
+		? t('size.megabytes', { count: Math.round((bytes / 1024 / 1024) * 10) / 10 })
+		: t('size.kilobytes', { count: Math.max(1, Math.round(bytes / 1024)) });
 
 /**
  * What a `data:` URL's picture weighs as a file: its base64 decoded, four
@@ -175,7 +178,7 @@ export async function uploadBackgroundImage(
  */
 async function writeImage(name: string, file: File): Promise<void> {
 	// The folder is written around storage.ts, so its read-only switch is asked here.
-	if (isReadOnly()) throw new Error('This tab is read only.');
+	if (isReadOnly()) throw new Error(t('tab.readOnly'));
 	forgetObjectUrl(name);
 	const folder = await readyFolder();
 	if (folder) {
@@ -373,7 +376,7 @@ async function fileIn(folder: PickedFolder, name: string): Promise<File | null> 
 }
 
 /** A root directory has no name of its own, and "goes into ." is not a sentence. */
-const folderName = (handle: PickedFolder) => handle.name || 'the folder you chose';
+const folderName = (handle: PickedFolder) => handle.name || t('folder.unnamed');
 
 export interface FolderState {
 	name: string;

@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { STORE_FONTS, idbGet, idbKeys } from './storage';
 import type { StoredFont } from './fonts';
 
@@ -232,7 +233,7 @@ export async function elementToPng(
 ): Promise<PngResult> {
 	const width = node.offsetWidth;
 	const height = node.offsetHeight;
-	if (!width || !height) throw new Error('Nothing to export.');
+	if (!width || !height) throw new Error(t('png.nothing'));
 
 	const clone = node.cloneNode(true) as HTMLElement;
 	clone.setAttribute('xmlns', XHTML);
@@ -258,7 +259,7 @@ export async function elementToPng(
 	canvas.width = Math.round((turn ? height : width) * pixelRatio);
 	canvas.height = Math.round((turn ? width : height) * pixelRatio);
 	const context = canvas.getContext('2d');
-	if (!context) throw new Error('This browser will not give a canvas to draw on.');
+	if (!context) throw new Error(t('png.noCanvas'));
 	// Turned as it is drawn rather than drawn and then turned: one canvas, one
 	// encode. A quarter turn clockwise about the top left corner puts the
 	// picture to the left of the canvas, so it is slid back across first.
@@ -270,7 +271,7 @@ export async function elementToPng(
 	context.drawImage(image, 0, 0);
 
 	const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-	if (!blob) throw new Error('The image could not be encoded.');
+	if (!blob) throw new Error(t('png.notEncoded'));
 	return { blob, missingFonts: families.filter((f) => f && !embedded.has(f.toLowerCase())) };
 }
 
@@ -283,7 +284,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 	return new Promise((resolve, reject) => {
 		const image = new Image();
 		image.onload = () => resolve(image);
-		image.onerror = () => reject(new Error('The card could not be rasterised.'));
+		image.onerror = () => reject(new Error(t('png.notRasterised')));
 		image.src = src;
 	});
 }

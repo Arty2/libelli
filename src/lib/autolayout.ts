@@ -1,3 +1,4 @@
+import type { MessageKey } from './i18n';
 import { localImageName } from './assets';
 import { eanDigits } from './barcode';
 import { parseColor } from './color';
@@ -103,20 +104,20 @@ export const FIELD_KINDS: FieldKind[] = [
 	'credit'
 ];
 
-export const KIND_LABELS: Record<FieldKind, string> = {
-	title: 'Title',
-	subtitle: 'Subtitle',
-	detail: 'Detail',
-	body: 'Body',
-	notes: 'Notes',
-	label: 'Byline',
-	number: 'Number',
-	date: 'Date',
-	image: 'Image',
-	link: 'QR code',
-	barcode: 'Barcode',
-	code: 'Code',
-	credit: 'Credit'
+export const KIND_LABELS: Record<FieldKind, MessageKey> = {
+	title: 'fieldKind.title',
+	subtitle: 'fieldKind.subtitle',
+	detail: 'fieldKind.detail',
+	body: 'fieldKind.body',
+	notes: 'fieldKind.notes',
+	label: 'fieldKind.label',
+	number: 'fieldKind.number',
+	date: 'fieldKind.date',
+	image: 'fieldKind.image',
+	link: 'fieldKind.link',
+	barcode: 'fieldKind.barcode',
+	code: 'fieldKind.code',
+	credit: 'fieldKind.credit'
 };
 
 // ---- reading a column ------------------------------------------------------
