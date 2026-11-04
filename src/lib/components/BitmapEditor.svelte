@@ -512,6 +512,10 @@
 			}
 			measure();
 			say('Pasted');
+		} catch {
+			// An image the browser cannot decode rejects here; without this the
+			// paste fails silently, which looks exactly like it having worked.
+			say('That image could not be read', 'warning');
 		} finally {
 			URL.revokeObjectURL(source);
 		}
