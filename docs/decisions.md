@@ -530,6 +530,16 @@ already existed, rather than a third state to keep in step.
 
 ## `src/lib/css.ts`
 
+**The guards read what CSS reads, not what was typed.** `\75rl(` is `url(` and
+`@\69mport` is `@import` to a browser, so a regex on the literal text let both
+through; `unescapeLetters` writes letter escapes as themselves, outside strings,
+before any guard runs. Letters only: `.\31 0` is how a class starting with a
+digit is written, and decoding it would change what it selects. `image-set("…")`
+and `src("…")` take a bare string as an address, so `neuterStrings` drops a call
+holding any string that is not a `data:` picture. Same family as `cssUrl` in
+`assets.ts`, which percent-encodes control characters: a line break ends a CSS
+string, and `new URL` ignores one when it validates.
+
 **An area's name is its CSS id, and `cssIdent` is the one place a name becomes
 one.** A template's own CSS is the escape hatch for everything the bar does not
 offer, and it was reaching areas by nothing but `.box` (now `.area`) — all of them at once.

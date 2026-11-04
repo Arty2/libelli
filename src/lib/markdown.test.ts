@@ -111,6 +111,21 @@ describe('inline', () => {
 	});
 });
 
+describe('links', () => {
+	it('keeps an address whole when it holds what would otherwise be emphasis', () => {
+		expect(renderInline('[x](https://a.example/a__b__c)')).toBe('<a href="https://a.example/a__b__c" style="color:inherit">x</a>');
+		expect(renderInline('[x](https://a.example/*a*/*b*)')).toBe('<a href="https://a.example/*a*/*b*" style="color:inherit">x</a>');
+	});
+
+	it('still sets the words of the link in emphasis', () => {
+		expect(renderInline('[**x**](https://a.example/)')).toBe('<a href="https://a.example/" style="color:inherit"><strong>x</strong></a>');
+	});
+
+	it('cannot be forged by a sentinel in the cell', () => {
+		expect(renderInline('\u00030\u0004 [x](https://a.example/)')).not.toContain('undefined');
+	});
+});
+
 describe('renderMarkdown paragraph style', () => {
 	const two = 'One\n\nTwo';
 

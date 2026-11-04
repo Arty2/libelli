@@ -342,7 +342,11 @@ export function parseBlocks(src: string): Block[] {
 // content can forge one.
 const CODE_OPEN = String.fromCharCode(1);
 const CODE_CLOSE = String.fromCharCode(2);
-const SENTINELS = new RegExp(`[${CODE_OPEN}${CODE_CLOSE}]`, 'g');
+// The same for a link's opening tag, parked so the emphasis rules below cannot
+// reach into its address: `a__b__c` in a URL is not bold.
+const LINK_OPEN = String.fromCharCode(3);
+const LINK_CLOSE = String.fromCharCode(4);
+const SENTINELS = new RegExp(`[${CODE_OPEN}${CODE_CLOSE}${LINK_OPEN}${LINK_CLOSE}]`, 'g');
 
 /** Inline markup. Input is raw text; it is escaped here, once, at the leaves. */
 export function renderInline(text: string): string {
@@ -355,10 +359,12 @@ export function renderInline(text: string): string {
 
 	out = escapeHtml(out);
 
+	const tags: string[] = [];
 	out = out.replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, (whole, label: string, href: string) => {
 		const url = safeUrl(unescapeEntities(href));
 		if (!url) return whole;
-		return `<a href="${escapeHtml(url)}" style="color:inherit">${label}</a>`;
+		tags.push(`<a href="${escapeHtml(url)}" style="color:inherit">`);
+		return `${LINK_OPEN}${tags.length - 1}${LINK_CLOSE}${label}</a>`;
 	});
 	// [words]{red} / [words]{#b42318} — per-word color, the reason a color
 	// parser sits between the text and the style attribute.
@@ -378,6 +384,8 @@ export function renderInline(text: string): string {
 	// colours, black on yellow, which read on any paper an area is set on.
 	out = out.replace(/==(?=[^\s=])([^=]*?[^\s=])==/g, '<mark>$1</mark>');
 	out = out.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+
+	out = out.replace(new RegExp(`${LINK_OPEN}(\\d+)${LINK_CLOSE}`, 'g'), (_match, i: string) => tags[Number(i)]);
 
 	const codeStyle = 'font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.92em';
 	return out.replace(new RegExp(`${CODE_OPEN}(\\d+)${CODE_CLOSE}`, 'g'), (_match, i: string) => {

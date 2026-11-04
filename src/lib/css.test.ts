@@ -62,6 +62,31 @@ describe('scopeCss', () => {
 	});
 });
 
+describe('scopeCss, written around its guards', () => {
+	const scoped = (css: string) => scopeCss(css, '.trim');
+
+	it('reads an escaped url( and @import as what CSS reads them as', () => {
+		expect(scoped('p { background: \\75rl(https://example.com/x.png) }')).toBe('.trim p { background: none }');
+		expect(scoped('p { background: u\\72l("https://example.com/x.png") }')).toBe('.trim p { background: none }');
+		expect(scoped('@\\69mport "https://example.com/x.css"; p { color: red }')).toBe('.trim p { color: red }');
+	});
+
+	it('leaves an escaped digit alone, which is how a class starting with one is written', () => {
+		expect(scoped('.\\31 0 { color: red }')).toBe('.trim .\\31 0 { color: red }');
+	});
+
+	it('does not read an escaped quote as the end of a string', () => {
+		expect(scoped('p::after { content: "\\"" } a { color: red }')).toContain('a { color: red }');
+	});
+
+	it('neuters image-set and src() given a remote string, which is a url without the word', () => {
+		expect(scoped('p { background: image-set("https://example.com/x.png" 1x) }')).not.toContain('example.com');
+		expect(scoped('p { background: -webkit-image-set("https://example.com/x.png" 1x) }')).not.toContain('example.com');
+		expect(scoped('p { background: src("https://example.com/x.png") }')).not.toContain('example.com');
+		expect(scoped('p { background: image-set("data:image/gif;base64,AAA" 1x) }')).toContain('data:image/gif');
+	});
+});
+
 describe('styleTag', () => {
 	it('wraps scoped css without writing a literal tag pair into a component', () => {
 		expect(styleTag('.trim p { color: red }')).toBe('<style>.trim p { color: red }</style>');
