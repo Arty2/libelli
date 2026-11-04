@@ -40,11 +40,15 @@ const REACHES_OUT = /url\(\s*['"]?\s*(?!data:image\/|#)|@import|image-set|\\|exp
 
 function attributeOk(name: string, value: string): boolean {
 	if (!/^[A-Za-z_][-A-Za-z0-9_:.]*$/.test(name)) return false;
-	if (/^on/i.test(name)) return false;
-	if (name === 'href' || name === 'xlink:href') return LOCAL_REFERENCE.test(value);
-	if (name === 'style') return !REACHES_OUT.test(value);
-	// Every other attribute is a presentation value: a paint, a length, a path.
-	return !/javascript:|url\(\s*['"]?\s*(?!data:image\/|#)/i.test(value);
+	// The page's HTML parser lower-cases every attribute name, so `HREF` and
+	// `XLink:href` arrive as the `href` and `xlink:href` checked here.
+	const lower = name.toLowerCase();
+	if (lower.startsWith('on')) return false;
+	if (lower === 'href' || lower.endsWith(':href')) return LOCAL_REFERENCE.test(value);
+	// Every other attribute is a paint, a length or a path, and a presentation
+	// attribute is read as CSS: `fill="\75 rl(…)"` is a `url(` like any in a
+	// style, so each gets the style's test, escapes included.
+	return !REACHES_OUT.test(value);
 }
 
 const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -61,7 +65,9 @@ function write(element: XmlElement, scope: string): string {
 		// A stylesheet inside an inline SVG applies to the whole document, so it
 		// is scoped to pictures on a card like the template's own CSS is.
 		const css = element.children.filter((c): c is string => typeof c === 'string').join('');
-		return `<style>${scopeCss(css, scope).replace(/</g, '')}</style>`;
+		// Escaped, not trusted as raw text: inside an SVG the page's parser
+		// decodes entities in a style, so `&#x75;rl(` would arrive as `url(`.
+		return `<style>${escape(scopeCss(css, scope)).replace(/>/g, '&gt;')}</style>`;
 	}
 	const inner = element.children.map((child: XmlNode) => (typeof child === 'string' ? escape(child).replace(/>/g, '&gt;') : write(child, scope))).join('');
 	return `<${element.name}${attrs}>${inner}</${element.name}>`;

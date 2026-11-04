@@ -36,6 +36,28 @@ describe('safeSvg', () => {
 		expect(safeSvg('<svg><use href="#a"/></svg>')).toContain('href="#a"');
 	});
 
+	it('checks an attribute by the name the page will read, whatever its case', () => {
+		expect(safeSvg('<svg><image HREF="https://example.com/a.png"/></svg>')).not.toContain('example.com');
+		expect(safeSvg('<svg><image XLINK:HREF="https://example.com/b.png"/></svg>')).not.toContain('example.com');
+		expect(safeSvg('<svg ONLOAD="alert(1)"/>')).not.toMatch(/onload/i);
+		expect(safeSvg('<svg><use HREF="#a"/></svg>')).toContain('HREF="#a"');
+	});
+
+	it('reads a presentation attribute as CSS: an escaped url( is still a url(', () => {
+		expect(safeSvg('<svg><rect fill="\\75 rl(https://example.com/d.svg#p)"/></svg>')).not.toContain('example.com');
+		expect(safeSvg('<svg><rect fill="url(#g)" stroke="#000"/></svg>')).toBe('<svg><rect fill="url(#g)" stroke="#000"></rect></svg>');
+	});
+
+	it('escapes its stylesheet, since the page decodes entities inside an SVG style', () => {
+		const out = safeSvg('<svg><style>rect{fill:&amp;#x75;rl(https://example.com/c.svg#p)} a>b{fill:red}</style></svg>');
+		expect(out).not.toMatch(/&#x75;/);
+		expect(out).toContain('&amp;#x75;');
+		expect(out).toContain('&gt;');
+		// What the page reads back is the stylesheet as written, entities left as text.
+		const decoded = out.replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
+		expect(decoded).toContain('&#x75;rl(');
+	});
+
 	it('scopes a stylesheet to pictures on a card, since an inline one reaches the whole page', () => {
 		const out = safeSvg('<svg><style>.a{fill:red} body{display:none} @import "https://example.com/x.css";</style></svg>');
 		expect(out).not.toContain('example.com');

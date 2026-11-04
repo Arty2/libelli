@@ -76,8 +76,10 @@ function sanitise(css: string): string {
 		// `@import url(...)` and `@import "..."` alike: everything to the semicolon.
 		.replace(/@import\b[^;]*;?/gi, '')
 		.replace(/<\/\s*style/gi, '')
-		.replace(/url\(\s*(['"]?)([^'")]*)\1\s*\)/gi, (whole, _quote, value: string) =>
-			/^data:/i.test(value.trim()) ? whole : 'none'
+		// A quoted address is read as a string, escapes and all: matching up to the
+		// first `)` let `url("https://x/a).png")` through untouched.
+		.replace(/url\(\s*(?:"((?:\\[\s\S]|[^"\\])*)"|'((?:\\[\s\S]|[^'\\])*)'|([^)]*))\s*\)/gi, (whole, double?: string, single?: string, bare?: string) =>
+			/^data:/i.test((double ?? single ?? bare ?? '').trim()) ? whole : 'none'
 		);
 	return neuterStrings(plain);
 }

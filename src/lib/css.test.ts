@@ -85,6 +85,12 @@ describe('scopeCss, written around its guards', () => {
 		expect(scoped('p { background: src("https://example.com/x.png") }')).not.toContain('example.com');
 		expect(scoped('p { background: image-set("data:image/gif;base64,AAA" 1x) }')).toContain('data:image/gif');
 	});
+
+	it('reads a quoted address to its closing quote, a ) inside it included', () => {
+		expect(scoped('p { background: url("https://example.com/a).png") }')).not.toContain('example.com');
+		expect(scoped("p { background: url('https://example.com/a\\'b).png') }")).not.toContain('example.com');
+		expect(scoped('p { background: url("data:image/gif;base64,A)A") }')).toContain('data:image/gif;base64,A)A');
+	});
 });
 
 describe('styleTag', () => {
