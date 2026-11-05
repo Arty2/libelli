@@ -2753,10 +2753,15 @@
 		if (previousTemplate === gone) rememberTemplate('');
 		const rest = library.filter((entry) => entry.id !== gone);
 		describe(t('history.deleteNamed', { name }));
-		if (rest.length) {
-			templateId = '';
-			await switchTemplate(rest[0].id);
-		} else {
+		// The next that opens, not just the next: one that will not (gone from
+		// storage, or written by a newer version) left the deleted design on
+		// screen with no id, and nothing done to it after that was saved.
+		templateId = '';
+		for (const entry of rest) {
+			await switchTemplate(entry.id);
+			if (templateId) break;
+		}
+		if (!templateId) {
 			// The last one out lands on a new, empty template — the same thing New
 			// Template gives you. It used to rebuild the starter card, which meant
 			// deleting the card a first run lands on appeared to do nothing at all:
@@ -2900,10 +2905,13 @@
 		if (previousTable === gone) rememberTable('');
 		const rest = tables.filter((entry) => entry.id !== gone);
 		describe(t('history.deleteNamed', { name }));
-		if (rest.length) {
-			datasetId = '';
-			await switchDataset(rest[0].id);
-		} else {
+		// The next that opens, as with a template: see deleteTemplate.
+		datasetId = '';
+		for (const entry of rest) {
+			await switchDataset(entry.id);
+			if (datasetId) break;
+		}
+		if (!datasetId) {
 			datasetId = nextDatasetId();
 			saveDatasetId(datasetId);
 			dataset = { columns: [], rows: [] };
