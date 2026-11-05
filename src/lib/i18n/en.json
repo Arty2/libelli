@@ -2031,6 +2031,10 @@
 		"defaultMessage": "Undo (Ctrl/Cmd+Z)",
 		"description": "Tooltip of Undo while drawing."
 	},
+	"draw.unreadable": {
+		"defaultMessage": "That image could not be read",
+		"description": "Warning when the image pasted into the drawing cannot be decoded."
+	},
 	"draw.weight": {
 		"defaultMessage": "/ {weight} KB",
 		"description": "How much the drawing adds to its table cell, in kilobytes."
@@ -3974,6 +3978,10 @@
 	"pictures.status.unused": {
 		"defaultMessage": "local · unused",
 		"description": "Tag on a font whose file is in this browser but not used."
+	},
+	"pictures.storeFailed": {
+		"defaultMessage": "{name} could not be kept — this browser may be out of room, or the folder moved.",
+		"description": "Warning: storing an uploaded, replaced or edited picture failed."
 	},
 	"pictures.systemFontNoFile": {
 		"defaultMessage": "{family} is a system font — it is on the computer already, so there is no file to upload",

@@ -513,6 +513,10 @@
 			}
 			measure();
 			say(t('draw.pasted'));
+		} catch {
+			// An image the browser cannot decode rejects here; without this the
+			// paste fails silently, which looks exactly like it having worked.
+			say(t('draw.unreadable'), 'warning');
 		} finally {
 			URL.revokeObjectURL(source);
 		}

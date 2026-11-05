@@ -7,6 +7,7 @@ import { IMPOSITION_COUNTS, SHEET_ORDERS } from './imposition';
 import { fromFile, toFile } from './frame';
 import { DEFAULT_LANG, safeLang } from './lang';
 import type {
+	Align,
 	Anchor,
 	ColorSources,
 	Row,
@@ -23,6 +24,7 @@ import type {
 	ListNumbering,
 	Leader,
 	ListStyle,
+	MarkdownStyle,
 	Mapping,
 	PageBackgroundImage,
 	PageNumberPosition,
@@ -35,7 +37,9 @@ import type {
 	SideValue,
 	Sides,
 	Template,
-	TextColumns
+	TextCase,
+	TextColumns,
+	VAlign
 } from './types';
 import { FONT_KINDS, SCHEMA_VERSION, clampXHeight } from './types';
 
@@ -456,9 +460,9 @@ export function newBox(partial: Partial<Box> = {}): Box {
 		// Anything optional that is not named here is dropped on load: this list
 		// is the box format, so a new field has to be added in both places.
 		...stripUndefined({
-			font: partial.font,
 			size: optionalAtLeast(partial.size, MIN_SIZE),
-			weight: partial.weight === undefined ? undefined : Math.max(100, Math.min(900, num(partial.weight, 400))),
+			font: fontName(partial.font),
+			weight: weightOf(partial.weight),
 			lineHeight: optionalAtLeast(partial.lineHeight, MIN_LEADING),
 			paragraph: normaliseParagraph(partial.paragraph),
 			leader: normaliseLeader(partial.leader),
@@ -469,15 +473,17 @@ export function newBox(partial: Partial<Box> = {}): Box {
 			// style attribute; one that is not recognised is dropped rather than
 			// guessed at, the same rule the markdown renderer follows.
 			color: color(partial.color),
-			align: partial.align,
-			valign: partial.valign,
-			italic: partial.italic,
-			letterSpacing: partial.letterSpacing,
-			textCase: partial.textCase,
+			// Read, not trusted, like the color above: each is written into a
+			// style attribute, and a string there could carry declarations.
+			align: oneOf(ALIGNS, partial.align),
+			valign: oneOf(VALIGNS, partial.valign),
+			italic: partial.italic ? true : undefined,
+			letterSpacing: finite(partial.letterSpacing),
+			textCase: oneOf(TEXT_CASES, partial.textCase),
 			// Only beside the page's size, as the bar offers it: a box with a
 			// size of its own keeps that and drops this.
 			xHeight: partial.size === undefined ? clampXHeight(partial.xHeight === undefined ? undefined : Number(partial.xHeight)) : undefined,
-			md: partial.md,
+			md: normaliseMd(partial.md),
 			qr: partial.mode === 'qr' ? normaliseQr(partial.qr) : partial.qr,
 			anchor: normaliseAnchor(partial.anchor),
 			rotation: normaliseRotation(partial.rotation),
@@ -527,9 +533,14 @@ export function normaliseTemplate(raw: unknown): Template {
 
 	// The defaults first: an area inheriting the page's alignment is placed
 	// by it, so its corner cannot be found from the file until they are read.
+	// Field by field, never spread from the file: each of these is written
+	// into a style attribute, and `"align": "left;background:url(…)"` spread
+	// in was a declaration of the file's own, past every guard css.ts keeps.
 	const defaults = stripUndefined({
-		...DEFAULT_DEFAULTS,
-		...stripUndefined(doc.defaults ?? {}),
+		font: fontName(doc.defaults?.font) ?? DEFAULT_DEFAULTS.font,
+		weight: weightOf(doc.defaults?.weight) ?? DEFAULT_DEFAULTS.weight,
+		align: oneOf(ALIGNS, doc.defaults?.align) ?? DEFAULT_DEFAULTS.align,
+		letterSpacing: finite(doc.defaults?.letterSpacing) ?? DEFAULT_DEFAULTS.letterSpacing,
 		color: color(doc.defaults?.color) ?? DEFAULT_DEFAULTS.color,
 		size: atLeast(doc.defaults?.size, MIN_SIZE, DEFAULT_DEFAULTS.size),
 		lineHeight: atLeast(doc.defaults?.lineHeight, MIN_LEADING, DEFAULT_DEFAULTS.lineHeight),
@@ -899,6 +910,54 @@ export function frameHeight(box: Pick<Box, 'h' | 'padding' | 'borderWidth'>): nu
 /** A recognised color, or nothing at all — never the string it was handed. */
 const color = (raw: unknown): string | undefined =>
 	parseColor(typeof raw === 'string' ? raw : undefined) ?? undefined;
+
+const ALIGNS: readonly Align[] = ['left', 'center', 'right', 'justify'];
+const VALIGNS: readonly VAlign[] = ['top', 'middle', 'bottom'];
+const TEXT_CASES: readonly TextCase[] = ['none', 'smallcaps', 'uppercase'];
+
+const oneOf = <T extends string>(list: readonly T[], raw: unknown): T | undefined =>
+	list.includes(raw as T) ? (raw as T) : undefined;
+
+/** A number, or nothing: `Number('1;x:y')` is NaN, so no string gets through as one. */
+function finite(raw: unknown): number | undefined {
+	if (raw === undefined || raw === null || raw === '') return undefined;
+	const n = Number(raw);
+	return Number.isFinite(n) ? n : undefined;
+}
+
+const weightOf = (raw: unknown): number | undefined => {
+	const n = finite(raw);
+	return n === undefined ? undefined : Math.max(100, Math.min(900, n));
+};
+
+/** A family's name as text; `fontStack` decides what of it a style may carry. */
+const fontName = (raw: unknown): string | undefined => (typeof raw === 'string' && raw.trim() ? raw : undefined);
+
+/**
+ * The Markdown metrics an area may set: numbers, and one color. A heading's
+ * weight and the rule's color are written into styles as they stand.
+ */
+function normaliseMd(raw: unknown): MarkdownStyle | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const md = raw as Record<string, Record<string, unknown> | undefined>;
+	const numbers = (part: Record<string, unknown> | undefined, keys: string[]) => {
+		if (!part || typeof part !== 'object') return undefined;
+		const kept = stripUndefined(Object.fromEntries(keys.map((k) => [k, k === 'weight' ? weightOf(part[k]) : finite(part[k])])));
+		return Object.keys(kept).length ? kept : undefined;
+	};
+	const heading = ['size', 'spaceBefore', 'spaceAfter', 'weight'];
+	const rule = numbers(md.rule, ['spaceBefore', 'spaceAfter']);
+	const ruleColor = color(md.rule?.color);
+	const out = stripUndefined({
+		h1: numbers(md.h1, heading),
+		h2: numbers(md.h2, heading),
+		h3: numbers(md.h3, heading),
+		paragraph: numbers(md.paragraph, ['spaceAfter']),
+		list: numbers(md.list, ['indent', 'markerGap', 'itemSpacing', 'spaceAfter']),
+		rule: rule || ruleColor ? { ...rule, ...(ruleColor ? { color: ruleColor } : {}) } : undefined
+	}) as MarkdownStyle;
+	return Object.keys(out).length ? out : undefined;
+}
 
 /** A paper dimension: a number, and never smaller than paper can be. */
 function paper(value: unknown, fallback: number): number {

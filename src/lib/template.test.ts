@@ -464,6 +464,38 @@ describe('arrangeBoxes', () => {
 	});
 });
 
+describe('values written into a style', () => {
+	const hostile = 'left;background:url(https://example.com/x.png)';
+
+	it('keeps only the words and numbers an area’s type may be', () => {
+		const box = newBox({ align: hostile, valign: hostile, textCase: hostile, letterSpacing: '0;x:y', weight: '400;x:y', italic: 'yes' } as never);
+		expect(box.align).toBeUndefined();
+		expect(box.valign).toBeUndefined();
+		expect(box.textCase).toBeUndefined();
+		expect(box.letterSpacing).toBeUndefined();
+		expect(box.weight).toBeUndefined();
+		expect(box.italic).toBe(true);
+		const kept = newBox({ align: 'justify', valign: 'middle', textCase: 'uppercase', letterSpacing: 0.25, weight: 600 });
+		expect([kept.align, kept.valign, kept.textCase, kept.letterSpacing, kept.weight]).toEqual(['justify', 'middle', 'uppercase', 0.25, 600]);
+	});
+
+	it('reads the page defaults field by field rather than spreading the file in', () => {
+		const { defaults } = normaliseTemplate({ boxes: [], defaults: { align: hostile, weight: hostile, letterSpacing: hostile, font: 7, extra: 'x' } });
+		expect(defaults.align).toBe('left');
+		expect(defaults.weight).toBe(400);
+		expect(defaults.letterSpacing).toBe(0);
+		expect(typeof defaults.font).toBe('string');
+		expect(JSON.stringify(defaults)).not.toContain('example.com');
+		expect('extra' in defaults).toBe(false);
+	});
+
+	it('keeps Markdown metrics as numbers and the rule as a color', () => {
+		const box = newBox({ md: { h1: { weight: '700;x:y', size: 2 }, rule: { color: 'red;x:y', spaceAfter: 1 }, list: { indent: 'wide' } } } as never);
+		expect(box.md).toEqual({ h1: { size: 2 }, rule: { spaceAfter: 1 } });
+		expect(newBox({ md: { rule: { color: '#b42318' } } }).md).toEqual({ rule: { color: '#b42318' } });
+	});
+});
+
 describe('newBox blending', () => {
 	it('keeps a blend mode it recognises', () => {
 		expect(newBox({ blend: 'multiply' }).blend).toBe('multiply');

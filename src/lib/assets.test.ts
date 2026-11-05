@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { backgroundStyle, dataUrlBytes, localImageName, localImageRef, safeImageUrl, safeMediaUrl, weigh } from './assets';
+import { backgroundStyle, cssUrl, dataUrlBytes, localImageName, localImageRef, safeImageUrl, safeMediaUrl, weigh } from './assets';
 
 describe('safeImageUrl', () => {
 	it('accepts the two schemes a browser should be pointed at', () => {
@@ -114,5 +114,18 @@ describe('what a data URL weighs', () => {
 		expect(weigh(10)).toBe('1 KB');
 		expect(weigh(1536)).toBe('2 KB');
 		expect(weigh(1.5 * 1024 * 1024)).toBe('1.5 MB');
+	});
+});
+
+describe('cssUrl', () => {
+	it('quotes an address, escaping the quote and the backslash', () => {
+		expect(cssUrl('https://example.com/a"b\\c')).toBe('url("https://example.com/a\\"b\\\\c")');
+	});
+
+	it('cannot be closed early by a line break, which new URL() ignores and a CSS string does not', () => {
+		const address = 'https://example.com/a\n);position:fixed;inset:0;--x:(';
+		expect(safeImageUrl(address)).not.toBe(null);
+		expect([...cssUrl(address)].some((c) => c.charCodeAt(0) < 32)).toBe(false);
+		expect(cssUrl(address)).toBe('url("https://example.com/a%0a);position:fixed;inset:0;--x:(")');
 	});
 });

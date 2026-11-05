@@ -152,7 +152,12 @@ export function dataUrlBytes(url: string): number {
 }
 
 /** A URL as it can be written inside a `url("…")`, quotes and all. */
-export const cssUrl = (src: string) => `url("${src.replace(/["\\]/g, '\\$&')}")`;
+// A line break ends a CSS string, and `new URL` ignores one when it validates, so
+// an address from a cell could close the quote early and write declarations of
+// its own into the style attribute. Control characters are percent-encoded: a
+// URL never needs one raw, and the browser reads the encoded form as the same.
+// eslint-disable-next-line no-control-regex
+export const cssUrl = (src: string) => `url("${src.replace(/[\u0000-\u001f\u007f]/g, (c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).replace(/["\\]/g, '\\$&')}")`;
 
 /**
  * Store an uploaded file and return the reference the template will carry.
@@ -191,11 +196,15 @@ async function writeImage(name: string, file: File): Promise<void> {
 		await idbDelete(STORE_ASSETS, assetKey(name));
 		return;
 	}
-	await idbSet(STORE_ASSETS, assetKey(name), {
+	const stored = await idbSet(STORE_ASSETS, assetKey(name), {
 		name,
 		type: file.type || 'image/png',
 		bytes: await file.arrayBuffer()
 	} satisfies StoredImage);
+	// idbSet answers false rather than throwing — a full disk, private
+	// browsing's quota — and a picture never kept was reported as added, its
+	// name put in a cell that would then point at nothing.
+	if (!stored) throw new Error(t('pictures.storeFailed', { name }));
 }
 
 /**

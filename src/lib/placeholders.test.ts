@@ -433,11 +433,13 @@ describe('%%today:countdown:…%%', () => {
 });
 
 describe('when the clock should next wake', () => {
+	// Always with a time: `new Date('2026-12-25')` is midnight in UTC, not here,
+	// which made this pass on a UTC machine only. momentOf reads it as here.
 	const t = (s: string) => new Date(s).getTime();
 
 	it('wakes when the number turns over, in the unit it is shown in', () => {
 		// 4 days 14 hours left: the count drops to 3 days in 14 hours.
-		expect(countdownWait(t('2026-12-25'), t('2026-12-20T10:00'))).toBe(14 * 3_600_000 + 1);
+		expect(countdownWait(t('2026-12-25T00:00'), t('2026-12-20T10:00'))).toBe(14 * 3_600_000 + 1);
 		// 40 minutes 30 seconds: in 30 seconds.
 		expect(countdownWait(t('2026-12-20T10:40'), t('2026-12-20T09:59:30'))).toBe(30_000 + 1);
 		// Counting up 3 days 2 hours: 4 days in 22 hours.

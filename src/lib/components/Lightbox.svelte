@@ -466,7 +466,10 @@
 			| undefined;
 		const request = orientation?.requestPermission;
 
-		const listen = () => window.addEventListener('deviceorientation', onOrientation);
+		// Not once the lightbox has gone: the permission prompt can be answered
+		// after it closed, and a listener added then was never taken off.
+		let live = true;
+		const listen = () => live && window.addEventListener('deviceorientation', onOrientation);
 
 		let ask: ((event: Event) => void) | null = null;
 		if (!sensing) {
@@ -490,6 +493,7 @@
 		frame = requestAnimationFrame(settle);
 
 		return () => {
+			live = false;
 			cancelAnimationFrame(frame);
 			window.removeEventListener('deviceorientation', onOrientation);
 			if (ask) window.removeEventListener('pointerdown', ask);

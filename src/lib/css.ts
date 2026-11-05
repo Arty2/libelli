@@ -66,20 +66,91 @@ export function cssIdent(name: string): string {
  */
 export const isPageId = (ident: string): boolean => /^(cover|back-cover|inside-cover|inside-back-cover|page-\d+)$/.test(ident);
 
+/**
+ * Every card on the page asks for the same stylesheet — the editor, each
+ * sheet in print, every row the overflow probe lays out — so the answer is
+ * remembered. A string in, a string out: nothing to go stale.
+ */
+const scoped = new Map<string, string>();
+
 export function scopeCss(css: string, scope: string): string {
 	if (!css || !css.trim()) return '';
-	return scopeRules(sanitise(css), scope);
+	const key = `${scope}\u0000${css}`;
+	let out = scoped.get(key);
+	if (out === undefined) {
+		if (scoped.size >= 32) scoped.clear();
+		out = scopeRules(sanitise(css), scope);
+		scoped.set(key, out);
+	}
+	return out;
 }
 
 function sanitise(css: string): string {
-	return css
-		.replace(/\/\*[\s\S]*?\*\//g, ' ')
+	const plain = unescapeLetters(css.replace(/\/\*[\s\S]*?\*\//g, ' '))
 		// `@import url(...)` and `@import "..."` alike: everything to the semicolon.
 		.replace(/@import\b[^;]*;?/gi, '')
 		.replace(/<\/\s*style/gi, '')
-		.replace(/url\(\s*(['"]?)([^'")]*)\1\s*\)/gi, (whole, _quote, value: string) =>
-			/^data:/i.test(value.trim()) ? whole : 'none'
+		// A quoted address is read as a string, escapes and all: matching up to the
+		// first `)` let `url("https://x/a).png")` through untouched.
+		.replace(/url\(\s*(?:"((?:\\[\s\S]|[^"\\])*)"|'((?:\\[\s\S]|[^'\\])*)'|([^)]*))\s*\)/gi, (whole, double?: string, single?: string, bare?: string) =>
+			/^data:/i.test((double ?? single ?? bare ?? '').trim()) ? whole : 'none'
 		);
+	return neuterStrings(plain);
+}
+
+/**
+ * Letters written as escapes, written as themselves, outside strings: CSS
+ * reads `\75rl(` as `url(` and `@\69mport` as `@import`, so the guards in
+ * `sanitise` would never see either. Letters only — an escaped digit is how
+ * `.\31 0` names a class, and decoding that would change what it selects.
+ */
+function unescapeLetters(css: string): string {
+	let out = '';
+	for (let i = 0; i < css.length; i++) {
+		const char = css[i];
+		if (char === '"' || char === "'") {
+			const end = closingQuote(css, i);
+			out += css.slice(i, end + 1);
+			i = end;
+			continue;
+		}
+		if (char === '\\') {
+			const hex = /^[0-9a-fA-F]{1,6}(?:\r\n|[ \t\r\n\f])?/.exec(css.slice(i + 1, i + 9));
+			const code = hex ? parseInt(hex[0], 16) : 0;
+			const decoded = hex ? (code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '') : css[i + 1];
+			if (decoded && /^[A-Za-z]$/.test(decoded)) {
+				out += decoded;
+				i += hex ? hex[0].length : 1;
+				continue;
+			}
+			// Not decoded, but its next character is still escaped: `\"` is not a quote.
+			out += char + (css[i + 1] ?? '');
+			i += 1;
+			continue;
+		}
+		out += char;
+	}
+	return out;
+}
+
+/**
+ * `image-set("…")` and `src("…")` take a bare string as a picture's address,
+ * so a remote one is a request with no `url(` for the rule above to find. A
+ * call is kept only when every string in it is an embedded picture.
+ */
+function neuterStrings(css: string): string {
+	const call = /(?<![\w-])(?:-webkit-)?(?:image-set|src)\(/gi;
+	let out = '';
+	let from = 0;
+	for (let m = call.exec(css); m; m = call.exec(css)) {
+		const end = closingParen(css, m.index + m[0].length - 1);
+		const strings = [...css.slice(m.index, end + 1).matchAll(/(['"])((?:\\.|(?!\1)[^\\])*)\1/g)];
+		if (strings.every((s) => /^data:/i.test(s[2].trim()))) continue;
+		out += css.slice(from, m.index) + 'none';
+		from = end + 1;
+		call.lastIndex = from;
+	}
+	return out + css.slice(from);
 }
 
 /**
@@ -186,6 +257,23 @@ function closingQuote(input: string, start: number): number {
 			continue;
 		}
 		if (input[i] === quote) return i;
+	}
+	return input.length - 1;
+}
+
+function closingParen(input: string, start: number): number {
+	let depth = 0;
+	for (let i = start; i < input.length; i++) {
+		const char = input[i];
+		if (char === '"' || char === "'") {
+			i = closingQuote(input, i);
+			continue;
+		}
+		if (char === '(') depth += 1;
+		if (char === ')') {
+			depth -= 1;
+			if (depth === 0) return i;
+		}
 	}
 	return input.length - 1;
 }

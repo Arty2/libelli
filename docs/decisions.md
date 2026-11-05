@@ -192,6 +192,16 @@ emulated screen with the window; testing this takes CDP's
 
 ## `src/lib/template.ts`
 
+**Every field that reaches a style is read, never copied.** Card writes an
+area's alignment, letter spacing and weight, and the page's defaults, straight
+into a style attribute, and markdown.ts does the same with a heading's weight
+and the rule's color. A string copied from the file into one of those was a
+declaration of the file's own (`"align": "left;background:url(…)"`), past every
+guard css.ts keeps. So each is checked against what it may hold: a word from
+its list, a finite number, or a color through color.ts. The defaults are built
+field by field rather than spread from the file. A field added to the format
+that reaches a style needs the same treatment here.
+
 **Stacking is array order**, not a z-index: `arrangeBoxes` moves boxes within the
 list, and returns the same array when there is nowhere to go so no undo entry is
 recorded for a no-op. Several move as a block; front and back gather them,
@@ -631,7 +641,45 @@ source: a static box with nothing typed into it still draws its fill, its border
 and its size, and `hideWhenEmpty` is what takes it away — two settings that
 already existed, rather than a third state to keep in step.
 
+## `src/lib/svg.ts`
+
+**An allowlist, written back from a parse, not a blacklist run over the text.**
+`static.svg` is markup from a template, and a template is a file someone can
+hand you. The first guard removed `<script>` and ` on…=` with two regexes;
+`<svg/onload=…>` has no space, a `javascript:` link passed whole, and
+`<image href="https://…">` made a request. A blacklist loses to whatever the
+next browser feature is; the XML reader (`xml.ts`) already exists, so the SVG is
+parsed, kept only as elements and attributes on the list, and serialised again
+with everything escaped. References may point inside the picture or carry their
+own pixels; an address is dropped. Not well-formed means nothing is drawn —
+the trade for not guessing the way an HTML parser would. A `<style>` goes through
+`scopeCss`, since inline SVG's stylesheet reaches the whole document.
+
+**Checked as the page will read it, not as it was written.** The page's HTML
+parser lower-cases attribute names, so `HREF` is checked as `href`. A
+presentation attribute is CSS, so `fill` gets the same test as `style`,
+backslash escapes included. Inside an SVG the parser decodes entities in a
+`<style>` (outside one it does not), so the scoped stylesheet is escaped on the
+way out; otherwise `&#x75;rl(` would arrive as `url(`. The rewrite is
+remembered per source, since every card draws the same picture.
+
 ## `src/lib/css.ts`
+
+**The guards read what CSS reads, not what was typed.** `\75rl(` is `url(` and
+`@\69mport` is `@import` to a browser, so a regex on the literal text let both
+through; `unescapeLetters` writes letter escapes as themselves, outside strings,
+before any guard runs. Letters only: `.\31 0` is how a class starting with a
+digit is written, and decoding it would change what it selects. `image-set("…")`
+and `src("…")` take a bare string as an address, so `neuterStrings` drops a call
+holding any string that is not a `data:` picture. Same family as `cssUrl` in
+`assets.ts`, which percent-encodes control characters: a line break ends a CSS
+string, and `new URL` ignores one when it validates. A quoted `url("…")` is
+read to its closing quote: matching to the first `)` left
+`url("https://x/a).png")` whole.
+
+**Scoped once, not once per card.** Every card on the page asks for the same
+stylesheet, and the answer is a pure function of the text, so `scopeCss`
+remembers recent answers.
 
 **An area's name is its CSS id, and `cssIdent` is the one place a name becomes
 one.** A template's own CSS is the escape hatch for everything the bar does not
@@ -969,6 +1017,10 @@ source. Only `data:` pictures are cropped — that is where drawings live, and i
 is also the only kind a canvas will read back, since anything from elsewhere
 taints it and refuses `toDataURL`. The cost is that the crop is asynchronous: a
 card drawn in the very first frame tiles the whole board until the crop lands.
+Every card asking while a crop is worked out waits on that same promise: the
+first version answered all but the first with nothing, and since a card does
+not ask twice, a run of rows tiled the whole board on every card but one. The
+cache is bounded, because each saved stroke is a new source.
 
 **Content is one question with four answers, and the format did not change.**
 Reaching a drawing by setting a static area's *mode* to "Image / Color" asks the

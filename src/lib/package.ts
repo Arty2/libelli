@@ -76,6 +76,9 @@ interface Manifest {
 	locked?: boolean;
 }
 
+/** The most blank rows at the end of a table that a package restores. */
+const MAX_BLANK_TAIL = 1000;
+
 const EXTENSIONS: Record<string, string> = { woff2: 'woff2', woff: 'woff', opentype: 'otf', truetype: 'ttf' };
 
 const enc = (text: string) => new TextEncoder().encode(text);
@@ -200,7 +203,10 @@ export function readPackage(files: Map<string, Uint8Array>, tableName: string): 
 	// took a one-column table with tabs in its words for two columns.
 	const dataset = { ...parseTable(text('table.csv'), { delimiter: ',' }), name: tableName };
 	// The blank rows at the end that CSV lost, put back.
-	const rows = Math.min(Number(manifest.rows) || 0, 100_000);
+	// Only the ones CSV drops, which is a handful: a count far past the rows
+	// the file holds is a manifest lying, and a card is drawn for every row,
+	// so a hundred thousand blank ones takes the tab down.
+	const rows = Math.min(Number(manifest.rows) || 0, dataset.rows.length + MAX_BLANK_TAIL);
 	while (dataset.rows.length < rows) dataset.rows.push(Object.fromEntries(dataset.columns.map((c) => [c, ''])));
 	// The order only when it still describes these rows: a number per row, each once.
 	const order = Array.isArray(manifest.order) ? manifest.order.map(Number) : null;

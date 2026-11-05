@@ -1293,6 +1293,13 @@
 		repeat = null;
 	}
 
+	$effect(() => () => {
+		if (repeat === null) return;
+		clearTimeout(repeat);
+		clearInterval(repeat);
+		repeat = null;
+	});
+
 	/**
 	 * Where the pad sits, in pixels off the bottom right of the stage.
 	 *
@@ -1348,6 +1355,14 @@
 	let padChoice = $state<boolean | null>(null);
 	/** Whether the pad is drawn, in whichever mode the stage is in. */
 	const padOpen = $derived(padChoice ?? panning);
+
+	// The pad's own pointerup is what stops a held arrow, and a pad that goes
+	// while one is held never hears it: the selection cleared under a finger
+	// left the repeat running, and the next area chosen slid away by itself.
+	const padShown = $derived(padUsable && padOpen && !viewOnly);
+	$effect(() => {
+		if (!padShown) untrack(stopNudge);
+	});
 	/** A touch screen, where Move mode offers the pad's button too. */
 	let coarse = $state(false);
 	/** The pad put away, by a hold, a throw or a flick: `thrown` brings it home next time. */
@@ -1652,7 +1667,7 @@
 	}
 </script>
 
-<svelte:window onkeydown={onKeydown} onkeyup={onKeyup} onblur={() => (pushed = null)} />
+<svelte:window onkeydown={onKeydown} onkeyup={onKeyup} onblur={stopNudge} />
 
 <!--
 	The stage is two elements: an outer one that does not scroll and holds every
@@ -2198,7 +2213,7 @@
 		/>
 	</div>
 
-	{#if padUsable && padOpen && !viewOnly}
+	{#if padShown}
 		<!-- Touch has no arrow keys, and dragging a 2mm nudge with a fingertip is
 		     hopeless. Shown only where there is no keyboard to fall back on, and
 		     only while there is something it could actually move. Its arrows

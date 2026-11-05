@@ -85,7 +85,7 @@ describe('inline', () => {
 	});
 
 	it('does not let bold be re-read as italic', () => {
-		expect(renderInline('**bold**')).not.toContain('<em>');
+		expect(renderInline('**bold**')).toBe('<strong>bold</strong>');
 	});
 
 	it('linkifies safe URLs only', () => {
@@ -108,6 +108,23 @@ describe('inline', () => {
 
 	it('leaves unsupported syntax as literal text', () => {
 		expect(render('> quote')).toContain('&gt; quote');
+	});
+});
+
+describe('links', () => {
+	it('keeps an address whole when it holds what would otherwise be emphasis', () => {
+		expect(renderInline('[x](https://a.example/a__b__c)')).toBe('<a href="https://a.example/a__b__c" style="color:inherit">x</a>');
+		expect(renderInline('[x](https://a.example/*a*/*b*)')).toBe('<a href="https://a.example/*a*/*b*" style="color:inherit">x</a>');
+	});
+
+	it('still sets the words of the link in emphasis', () => {
+		expect(renderInline('[**x**](https://a.example/)')).toBe('<a href="https://a.example/" style="color:inherit"><strong>x</strong></a>');
+	});
+
+	it('cannot be forged by a sentinel in the cell', () => {
+		const out = renderInline('\u00030\u0004 [x](https://a.example/)');
+		expect(out).not.toContain('undefined');
+		expect(out).toBe('0 <a href="https://a.example/" style="color:inherit">x</a>');
 	});
 });
 

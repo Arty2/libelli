@@ -235,6 +235,8 @@
 	 * a stale exclusion would drop paper nobody pointed at.
 	 */
 	let excludedSheets = $state<Set<number>>(new Set());
+	/** Everything that decides which pages land on which sheet. */
+	const sheetPlan = (t: Template) => JSON.stringify([{ ...t.print, background: undefined }, t.page.w, t.page.h, t.bleed]);
 	let helpOpen = $state(false);
 
 	/** The keys the Help panel lists, in its order: the chord, another way to the same, and what it does. */
@@ -1712,10 +1714,17 @@
 	 * the first): the set of names is then unchanged, so `imagesVersion` says
 	 * the bytes are new, or the cards keep the old picture, or none.
 	 */
-	async function storeImage(file: File): Promise<string> {
-		const name = await storeLocalImage(file);
-		imagesVersion += 1;
-		return name;
+	async function storeImage(file: File): Promise<string | null> {
+		try {
+			const name = await storeLocalImage(file);
+			imagesVersion += 1;
+			return name;
+		} catch {
+			// Nothing placed: a cell naming a picture that was never kept would
+			// show as missing on every card, with nothing to say why.
+			notify(t('pictures.storeFailed', { name: file.name }), 'warning');
+			return null;
+		}
 	}
 
 	async function handleImageDrop(box: Box, file: File) {
@@ -1723,7 +1732,8 @@
 		// Copy editing changes a row's picture, never another row's: a phone's
 		// photos are all `image.jpg` — see `underFreeName`. A designer dropping
 		// an updated `logo.png` means to replace it, so only here.
-		placeImage(box, await storeImage(copyMode ? await underFreeName(file) : file));
+		const name = await storeImage(copyMode ? await underFreeName(file) : file);
+		if (name) placeImage(box, name);
 	}
 
 	/**
@@ -2745,10 +2755,15 @@
 		if (previousTemplate === gone) rememberTemplate('');
 		const rest = library.filter((entry) => entry.id !== gone);
 		describe(t('history.deleteNamed', { name }));
-		if (rest.length) {
-			templateId = '';
-			await switchTemplate(rest[0].id);
-		} else {
+		// The next that opens, not just the next: one that will not (gone from
+		// storage, or written by a newer version) left the deleted design on
+		// screen with no id, and nothing done to it after that was saved.
+		templateId = '';
+		for (const entry of rest) {
+			await switchTemplate(entry.id);
+			if (templateId) break;
+		}
+		if (!templateId) {
 			// The last one out lands on a new, empty template — the same thing New
 			// Template gives you. It used to rebuild the starter card, which meant
 			// deleting the card a first run lands on appeared to do nothing at all:
@@ -2892,10 +2907,13 @@
 		if (previousTable === gone) rememberTable('');
 		const rest = tables.filter((entry) => entry.id !== gone);
 		describe(t('history.deleteNamed', { name }));
-		if (rest.length) {
-			datasetId = '';
-			await switchDataset(rest[0].id);
-		} else {
+		// The next that opens, as with a template: see deleteTemplate.
+		datasetId = '';
+		for (const entry of rest) {
+			await switchDataset(entry.id);
+			if (datasetId) break;
+		}
+		if (!datasetId) {
 			datasetId = nextDatasetId();
 			saveDatasetId(datasetId);
 			dataset = { columns: [], rows: [] };
@@ -4788,7 +4806,10 @@
 			onselect={selectBox}
 			onchange={updateBox}
 			onimagedrop={quiet ? undefined : (box, file) => void handleImageDrop(box, file)}
-			onimagepagedrop={quiet ? undefined : (file, x, y) => void (async () => placeImageOnPage(await storeImage(file), x, y, file))()}
+			onimagepagedrop={quiet ? undefined : (file, x, y) => void (async () => {
+				const name = await storeImage(file);
+				if (name) await placeImageOnPage(name, x, y, file);
+			})()}
 			onaction={describe}
 			onbounds={(show, ties) => (ui = { ...ui, showBounds: show, showTies: ties })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}
@@ -5587,7 +5608,12 @@
 			outputTurn = next;
 			saveTurn(next);
 		}}
-		ontemplatechange={applyTemplate}
+		ontemplatechange={(next) => {
+			// Per Sheet, the sheet's size or its order regroup the sheets as
+			// surely as the pages ticked do: an old index would leave out new paper.
+			if (sheetPlan(next) !== sheetPlan(template)) excludedSheets = new Set();
+			applyTemplate(next);
+		}}
 		onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
 		onnotice={notify}
 		onclose={() => (previewOpen = false)}

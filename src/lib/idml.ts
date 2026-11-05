@@ -96,9 +96,16 @@ function innerRect(item: XmlElement): Rect | null {
 		.map((p) => p.attrs.Anchor?.trim().split(/\s+/).map(Number))
 		.filter((p): p is number[] => !!p && p.length === 2 && p.every(Number.isFinite));
 	if (anchors.length) {
-		const xs = anchors.map((p) => p[0]);
-		const ys = anchors.map((p) => p[1]);
-		return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
+		// A loop, not `Math.min(...xs)`: a traced outline with over ~120k points
+		// overflows the call's arguments, and the import would fail as unreadable.
+		let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+		for (const [x, y] of anchors) {
+			if (x < left) left = x;
+			if (x > right) right = x;
+			if (y < top) top = y;
+			if (y > bottom) bottom = y;
+		}
+		return { left, top, right, bottom };
 	}
 	return readBounds(item.attrs.GeometricBounds);
 }

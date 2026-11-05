@@ -25,6 +25,7 @@ src/lib/
   types.ts        template + runtime types; every coordinate is mm, font sizes are pt
   color.ts       the only place a color string is allowed to become CSS
   css.ts          scopes the template's own CSS to the card; strips @import and remote url()
+  svg.ts          a template's inline SVG, rewritten from an allowlist: no script, links or requests
   csscode.ts      the CSS editor's colouring, and what Tab and Enter do to the text
   csskit.ts       the Starter sheet: this template's facts for a model, and the card's vars
   parse.ts        CSV / TSV parsing (quoted fields, embedded newlines, delimiter sniffing)
