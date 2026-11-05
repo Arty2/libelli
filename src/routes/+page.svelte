@@ -235,6 +235,8 @@
 	 * a stale exclusion would drop paper nobody pointed at.
 	 */
 	let excludedSheets = $state<Set<number>>(new Set());
+	/** Everything that decides which pages land on which sheet. */
+	const sheetPlan = (t: Template) => JSON.stringify([{ ...t.print, background: undefined }, t.page.w, t.page.h, t.bleed]);
 	let helpOpen = $state(false);
 
 	/** The keys the Help panel lists, in its order: the chord, another way to the same, and what it does. */
@@ -5606,7 +5608,12 @@
 			outputTurn = next;
 			saveTurn(next);
 		}}
-		ontemplatechange={applyTemplate}
+		ontemplatechange={(next) => {
+			// Per Sheet, the sheet's size or its order regroup the sheets as
+			// surely as the pages ticked do: an old index would leave out new paper.
+			if (sheetPlan(next) !== sheetPlan(template)) excludedSheets = new Set();
+			applyTemplate(next);
+		}}
 		onuploadprintbackground={(file) => void handlePrintBackgroundUpload(file)}
 		onnotice={notify}
 		onclose={() => (previewOpen = false)}
