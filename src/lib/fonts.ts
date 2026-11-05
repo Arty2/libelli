@@ -198,6 +198,8 @@ export async function fontKindOf(bytes: ArrayBuffer): Promise<FontKind | null> {
 	return tables ? kindFromTables(tables.get('OS/2'), tables.get('post')) : null;
 }
 
+const MAX_TABLE = 1 << 20;
+
 /** The named tables of an sfnt or WOFF file, inflated; `null` for anything else. */
 async function readTables(bytes: ArrayBuffer, wanted: string[]): Promise<Map<string, DataView> | null> {
 	const view = new DataView(bytes);
@@ -214,6 +216,9 @@ async function readTables(bytes: ArrayBuffer, wanted: string[]): Promise<Map<str
 			const offset = view.getUint32(at + 4);
 			const length = view.getUint32(at + 8);
 			const original = view.getUint32(at + 12);
+			// The tables read here (OS/2, post, name) run to kilobytes. One claiming to inflate
+			// past a megabyte is a file built to fill memory, not a font.
+			if (original > MAX_TABLE) continue;
 			const raw = bytes.slice(offset, offset + length);
 			tables.set(name, new DataView(length < original ? await inflate(raw) : raw));
 		}
