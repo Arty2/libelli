@@ -192,6 +192,16 @@ emulated screen with the window; testing this takes CDP's
 
 ## `src/lib/template.ts`
 
+**Every field that reaches a style is read, never copied.** Card writes an
+area's alignment, letter spacing and weight, and the page's defaults, straight
+into a style attribute, and markdown.ts does the same with a heading's weight
+and the rule's color. A string copied from the file into one of those was a
+declaration of the file's own (`"align": "left;background:url(…)"`), past every
+guard css.ts keeps. So each is checked against what it may hold: a word from
+its list, a finite number, or a color through color.ts. The defaults are built
+field by field rather than spread from the file. A field added to the format
+that reaches a style needs the same treatment here.
+
 **Stacking is array order**, not a z-index: `arrangeBoxes` moves boxes within the
 list, and returns the same array when there is nowhere to go so no undo entry is
 recorded for a no-op. Several move as a block; front and back gather them,
