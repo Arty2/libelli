@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { idbSet, isReadOnly, local, setReadOnly } from './storage';
+import { idbSet, isReadOnly, local, setReadOnly, storedDataset } from './storage';
 
 /** A localStorage that is only a Map, so the test needs no DOM. */
 function fakeStorage() {
@@ -44,5 +44,16 @@ describe('a read-only tab', () => {
 		setReadOnly(false);
 		local.set('a', 4);
 		expect(local.get('a', 0)).toBe(4);
+	});
+});
+
+describe('storedDataset', () => {
+	it('keeps a table, and reads anything else as missing rather than crashing on it', () => {
+		const table = { columns: ['a'], rows: [{ a: '1' }], name: 'T' };
+		expect(storedDataset(table)).toBe(table);
+		expect(storedDataset({ columns: [], rows: [] })).toEqual({ columns: [], rows: [] });
+		for (const bad of [undefined, null, 'x', [], { columns: ['a'] }, { rows: [] }, { columns: [1], rows: [] }, { columns: [], rows: [null] }, { columns: [], rows: [['a']] }]) {
+			expect(storedDataset(bad)).toBeUndefined();
+		}
 	});
 });

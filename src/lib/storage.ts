@@ -222,7 +222,23 @@ export const storageAvailable = () => openDb().then((db) => db !== null);
 export const saveTemplate = (t: Template) => idbSet(STORE_KV, KEY_TEMPLATE, toFile(t));
 export const loadTemplate = () => idbGet<Template>(STORE_KV, KEY_TEMPLATE);
 export const saveDataset = (d: Dataset) => idbSet(STORE_KV, KEY_DATASET, d);
-export const loadDataset = () => idbGet<Dataset>(STORE_KV, KEY_DATASET);
+export const loadDataset = () => idbGet<unknown>(STORE_KV, KEY_DATASET).then(storedDataset);
+
+/**
+ * A stored table, if it has the shape of one. A template is normalised as it
+ * is read; a table was trusted, and one without its rows (a write cut short,
+ * a format from before) took the app down at every start until storage was
+ * cleared. One that is not a table reads as missing, which the callers
+ * already answer.
+ */
+export function storedDataset(raw: unknown): Dataset | undefined {
+	if (!raw || typeof raw !== 'object') return undefined;
+	const d = raw as Partial<Dataset>;
+	if (!Array.isArray(d.columns) || !Array.isArray(d.rows)) return undefined;
+	if (!d.columns.every((c) => typeof c === 'string')) return undefined;
+	if (!d.rows.every((r) => !!r && typeof r === 'object' && !Array.isArray(r))) return undefined;
+	return raw as Dataset;
+}
 
 // ---- the template library --------------------------------------------------
 
@@ -336,7 +352,7 @@ export const nextDatasetId = (): string => mintId('d');
 const datasetDocKey = (id: string) => `${KEY_DATASET_PREFIX}${id}`;
 
 export const saveDatasetDoc = (id: string, d: Dataset) => idbSet(STORE_KV, datasetDocKey(id), d);
-export const loadDatasetDoc = (id: string) => idbGet<Dataset>(STORE_KV, datasetDocKey(id));
+export const loadDatasetDoc = (id: string) => idbGet<unknown>(STORE_KV, datasetDocKey(id)).then(storedDataset);
 export const deleteDatasetDoc = (id: string) => idbDelete(STORE_KV, datasetDocKey(id));
 
 /**
