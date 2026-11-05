@@ -196,11 +196,15 @@ async function writeImage(name: string, file: File): Promise<void> {
 		await idbDelete(STORE_ASSETS, assetKey(name));
 		return;
 	}
-	await idbSet(STORE_ASSETS, assetKey(name), {
+	const stored = await idbSet(STORE_ASSETS, assetKey(name), {
 		name,
 		type: file.type || 'image/png',
 		bytes: await file.arrayBuffer()
 	} satisfies StoredImage);
+	// idbSet answers false rather than throwing — a full disk, private
+	// browsing's quota — and a picture never kept was reported as added, its
+	// name put in a cell that would then point at nothing.
+	if (!stored) throw new Error(t('pictures.storeFailed', { name }));
 }
 
 /**

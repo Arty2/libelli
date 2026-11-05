@@ -1712,10 +1712,17 @@
 	 * the first): the set of names is then unchanged, so `imagesVersion` says
 	 * the bytes are new, or the cards keep the old picture, or none.
 	 */
-	async function storeImage(file: File): Promise<string> {
-		const name = await storeLocalImage(file);
-		imagesVersion += 1;
-		return name;
+	async function storeImage(file: File): Promise<string | null> {
+		try {
+			const name = await storeLocalImage(file);
+			imagesVersion += 1;
+			return name;
+		} catch {
+			// Nothing placed: a cell naming a picture that was never kept would
+			// show as missing on every card, with nothing to say why.
+			notify(t('pictures.storeFailed', { name: file.name }), 'warning');
+			return null;
+		}
 	}
 
 	async function handleImageDrop(box: Box, file: File) {
@@ -1723,7 +1730,8 @@
 		// Copy editing changes a row's picture, never another row's: a phone's
 		// photos are all `image.jpg` — see `underFreeName`. A designer dropping
 		// an updated `logo.png` means to replace it, so only here.
-		placeImage(box, await storeImage(copyMode ? await underFreeName(file) : file));
+		const name = await storeImage(copyMode ? await underFreeName(file) : file);
+		if (name) placeImage(box, name);
 	}
 
 	/**
@@ -4788,7 +4796,10 @@
 			onselect={selectBox}
 			onchange={updateBox}
 			onimagedrop={quiet ? undefined : (box, file) => void handleImageDrop(box, file)}
-			onimagepagedrop={quiet ? undefined : (file, x, y) => void (async () => placeImageOnPage(await storeImage(file), x, y, file))()}
+			onimagepagedrop={quiet ? undefined : (file, x, y) => void (async () => {
+				const name = await storeImage(file);
+				if (name) await placeImageOnPage(name, x, y, file);
+			})()}
 			onaction={describe}
 			onbounds={(show, ties) => (ui = { ...ui, showBounds: show, showTies: ties })}
 			ongrid={(show) => (ui = { ...ui, showGrid: show })}

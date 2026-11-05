@@ -3979,6 +3979,10 @@
 		"defaultMessage": "local · unused",
 		"description": "Tag on a font whose file is in this browser but not used."
 	},
+	"pictures.storeFailed": {
+		"defaultMessage": "{name} could not be kept — this browser may be out of room, or the folder moved.",
+		"description": "Warning: storing an uploaded, replaced or edited picture failed."
+	},
 	"pictures.systemFontNoFile": {
 		"defaultMessage": "{family} is a system font — it is on the computer already, so there is no file to upload",
 		"description": "Tooltip of a disabled Upload… for a system font."

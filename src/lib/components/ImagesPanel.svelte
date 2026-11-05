@@ -251,7 +251,7 @@
 		const name = replacing;
 		replacing = null;
 		if (!file || !name) return;
-		await storeLocalImage(file, name);
+		if (!(await kept(() => storeLocalImage(file, name), name))) return;
 		await refresh();
 		onchanged();
 		onnotice(replacingPresent ? t('pictures.replaced', { name, file: file.name }) : t('pictures.restored', { name, file: file.name }));
@@ -396,14 +396,32 @@
 	 */
 	let fileInput = $state<HTMLInputElement | null>(null);
 
+	/**
+	 * Storing can fail — a full disk, a folder moved away, private browsing's
+	 * small quota — and an unhandled rejection said nothing, so a picture
+	 * that was never kept looked exactly like one that was.
+	 */
+	async function kept<T>(store: () => Promise<T>, name: string): Promise<T | null> {
+		try {
+			return await store();
+		} catch {
+			onnotice(t('pictures.storeFailed', { name }), 'warning');
+			return null;
+		}
+	}
+
 	async function upload(event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
 		const files = [...(input.files ?? [])].filter((file) => file.type.startsWith('image/'));
 		input.value = '';
 		if (!files.length) return;
 		const names: string[] = [];
-		for (const file of files) names.push(await storeLocalImage(file));
+		for (const file of files) {
+			const name = await kept(() => storeLocalImage(file), file.name);
+			if (name) names.push(name);
+		}
 		await refresh();
+		if (!names.length) return;
 		onchanged();
 		onnotice(t('pictures.added', { count: names.length, name: names[0] }));
 	}
@@ -619,7 +637,10 @@
 	function load(src: string) {
 		const image = new Image();
 		image.onload = () => {
-			if (!view) return;
+			// Only the picture still open: stepping on before a large one has
+			// decoded let it land late, under the next one's name, where a turn
+			// and Save would write it over that file.
+			if (!view || src !== focusUrl) return;
 			view.width = image.naturalWidth;
 			view.height = image.naturalHeight;
 			view.getContext('2d')?.drawImage(image, 0, 0);
@@ -729,7 +750,7 @@
 				onnotice(t('pictures.cannotWrite', { type: type.replace('image/', '').toUpperCase(), name }), 'warning');
 				return;
 			}
-			await storeLocalImage(new File([blob], name, { type }), name);
+			if (!(await kept(() => storeLocalImage(new File([blob], name, { type }), name), name))) return;
 			dirty = false;
 			await refresh();
 			onchanged();
