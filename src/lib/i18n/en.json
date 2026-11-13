@@ -4523,6 +4523,14 @@
 		"defaultMessage": "Look at this card full screen",
 		"description": "Tooltip of the card counter."
 	},
+	"stage.goFullScreen": {
+		"defaultMessage": "Full screen",
+		"description": "Screen-reader name of the button under the eye, while read only, that shows the card full screen."
+	},
+	"stage.goFullScreenTitle": {
+		"defaultMessage": "Full screen — the card alone, fitted to the screen. Escape comes back.",
+		"description": "Tooltip of the full-screen button under the eye, while read only."
+	},
 	"stage.grid": {
 		"defaultMessage": "Grid",
 		"description": "Checkbox: show the grid."

@@ -129,6 +129,11 @@
 		 * prints — no shadow, no eye — and fitted, as read only always is.
 		 */
 		bare?: boolean;
+		/**
+		 * Read only, not yet full screen, in a browser that can go there: the
+		 * button under the eye that asks for it. Absent, there is no button.
+		 */
+		onfullscreen?: () => void;
 	}
 
 	let {
@@ -196,6 +201,7 @@
 		onrelock,
 		viewOnly = false,
 		bare = false,
+		onfullscreen,
 		clock = 0,
 		onviewonly,
 		flashIds = []
@@ -293,6 +299,10 @@
 	 */
 	const fitScale = $derived.by(() => {
 		if (!hostSize.w || !hostSize.h) return 1;
+		// Full screen is a display: no shadow or chips to leave room for, and
+		// no ceiling — a business card on a large screen should fill it, not
+		// stop at twice its size in the middle of the black.
+		if (bare) return Math.max(0.15, Math.min(hostSize.w / mmToPx(outerW), hostSize.h / mmToPx(outerH)));
 		// Just enough room for the shadow and the corner chips. On a phone the
 		// stage is the whole screen, so every millimetre of padding is a
 		// millimetre of card you cannot see.
@@ -1962,11 +1972,17 @@
 	<!-- The right-hand column, and under it, on a phone, what acts on a set
 	     of areas (SelectionTools' `side`). -->
 	{#if viewOnly}
-		<!-- Where the padlock is on a locked design, and the one control here. -->
+		<!-- Where the padlock is on a locked design: the one control here, and
+		     under it the way to full screen. -->
 		<div class="corner top right view-eye">
 			<button class="square" title={t('stage.readOnlyTitle')} aria-label={t('stage.readOnly')} onclick={() => onviewonly?.()}>
 				<Icon name="view" size={16} />
 			</button>
+			{#if onfullscreen}
+				<button class="square" title={t('stage.goFullScreenTitle')} aria-label={t('stage.goFullScreen')} onclick={() => onfullscreen?.()}>
+					<Icon name="fit-to-screen" size={16} />
+				</button>
+			{/if}
 		</div>
 	{/if}
 	<div class="side-rail">
@@ -2314,6 +2330,16 @@
 		touch-action: pan-y;
 	}
 
+	/* And edge to edge: the fitted scale above leaves no room, so the
+	   viewport's padding and the scrollbar's reserved gutter would only push
+	   the card off centre, or into a scrollbar of its own. The zoom is held
+	   at Fit while read only, so there is nothing to scroll to. */
+	.stage.bare .viewport {
+		padding: 0;
+		overflow: hidden;
+		scrollbar-gutter: auto;
+	}
+
 	/* The frame: it holds every control and never scrolls, so nothing on it can
 	   slide away with the page. */
 	.stage {
@@ -2633,6 +2659,11 @@
 
 	.corner.top.right {
 		padding: 4px;
+	}
+
+	/* The eye, and the full-screen button under it. */
+	.view-eye {
+		flex-direction: column;
 	}
 
 	/* Placed as the left rail is: the column at the top right holds its own
