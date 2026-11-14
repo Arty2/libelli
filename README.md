@@ -44,9 +44,10 @@ following the row it is on, and **Close Tab** closes this tab. A read-only tab
 saves nothing; the eye beside the card brings the choice back, and its theme
 button changes that tab alone, until it is closed. Put a
 read-only tab in full screen and it shows the card alone, fitted to the
-screen, on black and in the colours it prints in, whatever the theme — a
-display; leaving full screen brings the rest back, as do Escape and a
-double-click. A read-only tab always fits the card to its own window; it does
+screen edge to edge, on black and in the colours it prints in, whatever the
+theme — a display; Escape leaves full screen and stays read only, and
+leaving it brings the rest back, as does a double-click. Under the eye,
+Full Screen (the fit-to-screen button) goes there in one press. A read-only tab always fits the card to its own window; it does
 not follow the editing tab's zoom. Its logo asks for full screen, and brings
 the choice back when the browser says no or it is full screen already.
 

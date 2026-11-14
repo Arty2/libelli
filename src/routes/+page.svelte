@@ -1137,7 +1137,14 @@
 	 * compared within a pixel, for the rounding a zoomed display does.
 	 */
 	let fullscreen = $state(false);
+	/**
+	 * Whether this browser lets a page ask for full screen at all — not an
+	 * iPhone's Safari, nor a frame without the permission. Read once mounted:
+	 * the prerendered page has no `document` to ask.
+	 */
+	let canFullscreen = $state(false);
 	$effect(() => {
+		canFullscreen = document.fullscreenEnabled;
 		const query = matchMedia('(display-mode: fullscreen)');
 		// The size test only in an ordinary browser window: an installed app
 		// on a tablet fills the screen without being full screen, and would
@@ -1228,10 +1235,35 @@
 			.requestFullscreen()
 			.then(() => {
 				// Ended while the request was pending: nothing left to show full screen.
-				if (!viewing) void document.exitFullscreen().catch(() => {});
+				if (!viewing && editor !== 'readonly') void document.exitFullscreen().catch(() => {});
 				else wentFullscreen = true;
 			})
 			.catch(() => {});
+	}
+
+	/**
+	 * The button under the eye: full screen, from read only, in either tab.
+	 * In the editing tab it is the logo's to undo too (`wentFullscreen`); in
+	 * a read-only tab there is nothing to undo, only Escape to leave by.
+	 */
+	function goFullscreen() {
+		if (editor !== 'readonly' && !viewing) return;
+		askFullscreen();
+	}
+
+	/**
+	 * Escape on the card alone, full screen through the Fullscreen API: out of
+	 * full screen, and only that — read only stays on, a second Escape being
+	 * the way on from there. Most browsers take that Escape themselves and the
+	 * page never sees it; this is for those that pass it on. A window made full
+	 * screen by the browser (F11) cannot be left from a script, so there the
+	 * key goes on to what it did before.
+	 */
+	function leaveFullscreen(): boolean {
+		if (!bare || !document.fullscreenElement) return false;
+		wentFullscreen = false;
+		void document.exitFullscreen().catch(() => {});
+		return true;
 	}
 
 	const bare = $derived((editor === 'readonly' || (editor === 'here' && viewing)) && fullscreen);
@@ -3347,6 +3379,7 @@
 		// shown alone. Never the second over the first: that one cannot be
 		// dismissed, and the first would be left under it.
 		if (editor === 'readonly' && event.key === 'Escape') {
+			if (!helpOpen && !whatsNewOpen && !statusOpen && !stageModalOpen && !readOnlyAsk && leaveFullscreen()) return;
 			if (helpOpen || whatsNewOpen || statusOpen) {
 				helpOpen = whatsNewOpen = statusOpen = false;
 			} else if (stageModalOpen) {
@@ -3362,7 +3395,7 @@
 			if (event.key === 'Escape') {
 				if (helpOpen || whatsNewOpen || statusOpen) helpOpen = whatsNewOpen = statusOpen = false;
 				else if (stageModalOpen) lightboxOpen = previewOpen = false;
-				else toggleReadOnly();
+				else if (!leaveFullscreen()) toggleReadOnly();
 				return;
 			}
 			if (!wantsExport(event)) return;
@@ -4782,6 +4815,7 @@
 			viewOnly={quiet}
 			{bare}
 			onviewonly={() => (viewing ? toggleReadOnly() : (readOnlyAsk = true))}
+			onfullscreen={canFullscreen && !fullscreen && (editor === 'readonly' || viewing) ? goFullscreen : undefined}
 			{template}
 			{row}
 			{mapping}
